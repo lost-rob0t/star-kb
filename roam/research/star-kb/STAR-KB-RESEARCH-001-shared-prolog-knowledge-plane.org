@@ -18,68 +18,81 @@
 
 | Date | Change | Author or actor | Evidence |
 |------+--------+-----------------+----------|
+| 2026-09-10 | Added the required Verified Facts / Inference / Contradictions / Unresolved Questions structure after CI exposed the missing RAGE research contract. | ChatGPT ARADR pass | star-kb validate workflow failure on prior head |
 | 2026-09-10 | Added the research stage to star-kb before the design stage, correcting the previous workflow ordering. | ChatGPT ARADR pass | Upstream research and current PQS source review |
 
 * Research Question
 
 How should =star-kb= become a large reusable corpus of Prolog facts and rules that many StarIntel actors and reasoning systems can query, without duplicating Prolog runtimes or turning arbitrary source files into executable production code?
 
-* Findings
+* Verified Facts
 
-The existing =lost-rob0t/prolog-query-server= should be reused as the live knowledge runtime. It already stores =prolog_fact= and =prolog_rule= documents in CouchDB, supports named KBs and immutable releases, executes bounded inference through a restricted meta-interpreter, exposes =/v1/query= and =/v1/explain=, returns query IDs and budgets, performs static release analysis, incrementally synchronizes through CouchDB =_changes=, and fails closed on unresolved knowledge conflicts.
+The existing =lost-rob0t/prolog-query-server= already provides the majority of the runtime machinery needed for a shared StarIntel knowledge plane.
 
-Therefore =star-kb= should primarily own *authoring, provenance, dependency composition, deterministic compilation, fixtures, and release publication*. It should not contain another HTTP inference server.
+Current verified runtime capabilities include:
 
-The best source representation is readable Prolog constrained to a deliberately small profile. SWI-Prolog can parse source terms without consulting/executing the source. A validator can then translate accepted facts/rules into the safe JSON AST already consumed by PQS. This reuses the real Prolog parser while preserving the production rule that CouchDB/HTTP knowledge is data, not arbitrary executable source.
+- CouchDB-persisted =prolog_fact= and =prolog_rule= documents;
+- multiple named knowledge bases;
+- a safe JSON AST for variables, compounds, and goals instead of raw executable Prolog over HTTP;
+- bounded backward-chaining inference through a custom meta-interpreter;
+- query budgets covering depth, solution count, timeout, inference steps, proof nodes, and proof bytes;
+- synchronous =/v1/query= and =/v1/explain= endpoints;
+- asynchronous query jobs and cancellation;
+- query IDs and runtime result metadata;
+- immutable knowledge releases selected by a per-KB manifest;
+- explicit release pinning;
+- static release analysis for predicate dependencies, arity problems, recursion, and negative cycles;
+- revision-aware fact/rule writes and release activation;
+- explanation/proof source information tied to CouchDB knowledge documents;
+- incremental CouchDB =_changes= synchronization after initial load;
+- fail-closed handling of unresolved knowledge conflicts;
+- separate read/write authorization capabilities;
+- a whitelist of safe deterministic builtins.
 
-Git and CouchDB have different authorities. Git is appropriate for reviewed reusable knowledge, source citations/licenses, dependency manifests, fixtures, and reproducible build inputs. CouchDB is appropriate for the executable release representation and active-release state. StarIntel stores remain appropriate for high-volume run observations, scraped evidence, and learned-model outputs. An observation does not automatically become canonical knowledge.
+The current PQS fact model contains =type=, =kb=, =enabled=, =predicate=, =args=, optional provenance, and for versioned knowledge a =release=. Persisted facts must be ground. Rules use a structured =head= and ordered =body=; variables are represented as ={ "var": "Name" }=, compounds as ={ "functor": ..., "args": [...] }=, explicit atoms as ={ "atom": ... }=, and negation as an explicit =not= goal.
 
-The current PQS API chooses one =(kb, release)= at query time. For the first version, source-level modules should therefore be composed at build time into an actor-facing *bundle*, and the bundle's full dependency closure should be published as one immutable PQS release. Native cross-KB imports are unnecessary until real corpus size shows that bundle flattening is too expensive.
+PQS currently exposes safe builtins including =eq/2=, =neq/2=, =calc/2=, numeric comparisons, type/shape checks, and a restricted arithmetic expression vocabulary such as =add/2=, =sub/2=, =mul/2=, and =div/2=.
 
-PQS release activation supports strict static analysis, but strict mode is not the backward-compatible default. =star-kb= publication should always request =strict:true= so malformed releases cannot become active through the normal publisher.
+The current =kb_service:query_kb/4= holds a per-KB mutex around release resolution, refresh/synchronization, and query execution. This means concurrent queries to the same KB can serialize today.
 
-For provenance, one derived result should be traceable through: StarIntel actor/version -> PQS query ID -> exact KB/release -> proof source CouchDB document IDs/revisions -> =star-kb= clause IDs/module/source records -> original citations/licenses.
+The existing =star-kb= repository is currently a RAGE template/control-plane skeleton. It already contains the research/design/implement/index convention and validation tooling but no product knowledge compiler or corpus yet.
 
-Dialect enrichment remains a useful first consumer, but it is not part of the generic bootstrap implementation. Dialect evidence must keep linguistic features, contextual geographic clues, explicit named-place clues, and learned-model evidence separate. Third-party survey data are useful for benchmarking; long-term reusable production knowledge should be self-sourced or otherwise clearly licensed.
+* Inference
 
-* Verified PQS Runtime Shape
+The strongest architecture implied by the verified facts is:
 
-A fact is represented approximately as:
+1. =star-kb= should own reviewed reusable knowledge source, provenance/source records, dependency composition, fixtures, deterministic compilation, and publication tooling.
+2. =prolog-query-server= should remain the live knowledge/inference runtime rather than introducing another Prolog service.
+3. Humans and agents should author readable Prolog, but source should be parsed as data and validated against a restricted profile before compilation into PQS's safe JSON AST.
+4. Git should remain the authority for reviewed reusable knowledge source; CouchDB should remain the authority for executable PQS release documents and active-release state; StarIntel stores should remain the authority for run-specific observations and model outputs.
+5. Source modules should compose into actor-facing bundles at build time. In V0.1, one bundle should become one PQS =(kb, release)= because that matches the existing runtime API and avoids premature cross-KB import semantics.
+6. Normal publication should always use PQS strict analysis during activation. A publisher should not expose an option that silently downgrades to non-strict activation.
+7. Runtime query/proof metadata should be preserved so a StarIntel result can be traced from actor -> PQS query ID -> KB/release -> CouchDB proof documents -> =star-kb= source clause/source record.
+8. Dialect enrichment is a strong first real consumer after the generic pipeline is proven, because it exercises reusable facts/rules, geography, uncertainty, provenance, and multiple evidence categories.
 
-#+begin_src json
-{
-  "type": "prolog_fact",
-  "kb": "example",
-  "release": "r-...",
-  "enabled": true,
-  "predicate": "human",
-  "args": ["socrates"],
-  "provenance": {"source": "example"}
-}
-#+end_src
+The source reader should reuse SWI-Prolog's own term parser in parse-only mode rather than implementing a second Prolog parser. Parsing is not consulting/executing: recognized directives can be returned as data and rejected by the restricted-profile validator.
 
-A rule is represented approximately as:
+* Contradictions
 
-#+begin_src json
-{
-  "type": "prolog_rule",
-  "kb": "example",
-  "release": "r-...",
-  "enabled": true,
-  "head": {
-    "predicate": "mortal",
-    "args": [{"var":"X"}]
-  },
-  "body": [
-    {
-      "predicate": "human",
-      "args": [{"var":"X"}]
-    }
-  ]
-}
-#+end_src
+There are no fatal contradictions in the current direction, but there are several tensions the design must resolve explicitly:
 
-Compound terms use ={ "functor": ..., "args": [...] }=, explicit atoms can use ={ "atom": ... }=, and rule variables use ={ "var": ... }=. Persisted facts must be ground.
+- We want Prolog to be the human authoring language, while PQS intentionally refuses raw executable Prolog over its runtime boundary. The design resolves this by parse-only restricted source -> safe AST compilation.
+- We want one large shared corpus, while PQS queries one named KB/release at a time. The V0.1 design resolves this by build-time module composition into bundles, accepting some duplication until measurements justify native runtime imports.
+- We want deterministic/reproducible releases, while Git commit IDs and build timestamps change even when logical knowledge does not. The design must separate semantic content identity from non-semantic build provenance.
+- We want high throughput eventually, while current same-KB PQS queries are serialized by a per-KB mutex. V0.1 should not redesign PQS without benchmarks, but high-throughput actor rollout needs a later concurrency measurement/gate.
+- We want a continuously growing corpus, while raw observations/training data can become far larger than a reviewable Git corpus. The design keeps observations outside canonical source and requires explicit promotion.
+
+* Unresolved Questions
+
+Questions intentionally left for implementation measurement or later ARADR passes:
+
+- What practical bundle/document/byte size reaches current PQS resource ceilings?
+- At what query rate does the per-KB mutex become a meaningful throughput bottleneck?
+- Will real actor evidence fit comfortably in bounded goal arguments, or will a query-scoped ephemeral evidence context eventually be needed?
+- Does probabilistic dialect scoring require a new safe builtin, cplint, or a separate model/fusion service after the deterministic baseline is measured?
+- When, if ever, does bundle flattening become expensive enough to justify native cross-KB imports?
+- What production signing/attestation mechanism should sit above deterministic hashes, if one is needed?
+- What first-party consent/retention/publication policy governs future dialect survey/training data?
 
 * Research Constraints Passed Into Design
 
@@ -87,41 +100,28 @@ Compound terms use ={ "functor": ..., "args": [...] }=, explicit atoms can use =
 - No actor-local copies of the canonical corpus.
 - No direct execution of source =.pl= files from actor input, CouchDB documents, model output, or scraped content.
 - No automatic observation -> canonical knowledge feedback loop.
-- No non-strict release activation through the normal publisher.
+- No non-strict release activation through normal =star-kb= tooling.
 - No need for native multi-KB runtime imports in V0.1.
 - No cplint/tabling requirement in V0.1.
 - No Prolog syntax added to StarLang core.
 - No dialect-specific assumptions in the generic compiler/publisher.
 - Every published clause must retain source/provenance identity.
-- Every query must remain bounded by the PQS resource model.
-
-* Open Questions Handed to Design
-
-The design must make explicit choices for:
-
-- repository layout;
-- source profile grammar and validation;
-- module and bundle metadata representation;
-- deterministic clause/document/release IDs;
-- build artifacts and cache policy;
-- exact publication state machine;
-- exact CLI surface;
-- exact PQS request mapping;
-- provenance metadata embedded in generated knowledge documents;
-- test structure and acceptance gates;
-- what the tiny first bundle proves;
-- how future StarIntel/Common Lisp and StarLang clients consume the runtime without coupling to source layout.
+- Every query remains bounded by PQS resource limits.
 
 * Upstream Research
 
-The longer research record is maintained in:
+Longer evidence records:
 
 - https://github.com/lost-rob0t/starintel-auto-research/blob/main/roam/research/star-kb/STAR-KB-RESEARCH-001-shared-prolog-knowledge-plane-and-dialect-enrichment.org
 - https://github.com/lost-rob0t/starintel-auto-research/blob/main/roam/research/star-kb/STAR-KB-RESEARCH-002-canonical-knowledge-plane-architecture-findings.org
 
+Primary runtime reviewed:
+
+- https://github.com/lost-rob0t/prolog-query-server
+
 * Footnotes and Glossary
 
-- *Canonical knowledge*: reusable facts/rules intentionally maintained as shared knowledge. It may be revised later; canonical does not mean infallible.
+- *Canonical knowledge*: reusable facts/rules intentionally maintained as shared knowledge. It may later be revised; canonical does not mean infallible.
 - *PQS*: =prolog-query-server=, the existing SWI-Prolog/CouchDB expert-system service.
 - *KB*: knowledge base, a named collection of facts and rules.
 - *Release*: an immutable version of one PQS KB. A manifest chooses which release is active by default.
@@ -133,3 +133,4 @@ The longer research record is maintained in:
 - *Provenance*: metadata showing where knowledge/results came from and which exact versions participated.
 - *Observation*: case/run-specific evidence, distinct from reusable shared knowledge.
 - *Strict activation*: PQS activation with static analysis required to pass before a staged release becomes active.
+- *Per-KB mutex*: a lock protecting one knowledge base from concurrent mutation/query-state races. In the current implementation it also means same-KB query executions are serialized while the lock is held.
