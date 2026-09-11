@@ -1,3 +1,1 @@
-# Agent entry point
-
-Read `AGENTS.md` before making changes. It is the repository-wide authority.
+Read and obey AGENTS.md. The current Star KB design is pending explicit user approval; do not implement it yet.
