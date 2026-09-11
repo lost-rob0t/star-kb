@@ -224,11 +224,12 @@ Rejected because it destroys the distinction between evidence and derivation and
 Rejected because the point of Star KB is shared reusable semantics.
 
 * Approval Table
-| Stage | State | Requirement |
-|-------+-------+-------------|
-| Research | approved | Existing research direction accepted |
-| Design | pending | User must explicitly approve this document |
-| Implementation | blocked | No implementation work before design approval |
+| Approval area | Required authority | State | Evidence required | Evidence reference |
+|---------------+--------------------+-------+-------------------+--------------------|
+| Research | Project owner | APPROVED | Approved shared-KB research direction | ../research/star-kb/dialect-and-kb-research.org |
+| Design | Project owner | PENDING | Explicit user approval of this design | this document |
+| Execution | Project owner | NOT STARTED | Approved bounded first implementation slice | |
 
 * Changelog
 - 2026-09-10 :: Initial deep-design proposal created. Awaiting explicit approval.
+- 2026-09-10 :: Aligned approval state with the RAGE document contract.
