@@ -1,9 +1,0 @@
-#+title: Star KB design lane
-#+description: Design notes for Star KB awaiting explicit approval before implementation.
-#+filetags: :star-kb:design:
-
-* Rule
-Design artifacts here are proposals. They do not authorize implementation.
-
-The active design is:
-- [[file:prolog-kb-query-server-design.org][Prolog KB and query-server deep design]]
