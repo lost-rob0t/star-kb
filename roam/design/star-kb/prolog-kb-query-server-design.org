@@ -1,0 +1,234 @@
+#+title: Star KB Prolog corpus and query-server deep design
+#+description: Reviewable design for the modular Prolog corpus, provenance model, predicate compatibility, validation, and query-server contract.
+#+filetags: :star-kb:design:prolog:query-server:
+:PROPERTIES:
+:ID: star-kb-prolog-kb-query-server-design
+:STATUS: pending-approval
+:END:
+
+* Design status
+This is a design artifact only. It MUST NOT be treated as approval to implement.
+
+* Goals
+- Establish a durable repository layout for a large multi-domain Prolog corpus.
+- Give actors one stable query boundary rather than direct coupling to repository internals.
+- Preserve provenance and distinguish asserted, imported, generated, and inferred knowledge.
+- Permit predicates and modules to evolve without silently changing consumer semantics.
+- Make the corpus testable, discoverable, and incrementally loadable.
+
+* Non-goals for the first implementation slice
+- Bulk population of real-world facts.
+- A universal ontology covering every StarIntel domain.
+- Replacing the Prolog query server with StarLang.
+- Adding learned/neural inference to the trusted fact store.
+- Actor-specific convenience APIs.
+
+* Repository layout
+#+begin_src text
+kb/
+  core/
+    identity.pl
+    provenance.pl
+    time.pl
+    schema.pl
+  domains/
+    <domain>/
+      module.pl
+      facts/
+      rules/
+      tests/
+  sources/
+    source_registry.pl
+  generated/
+    .gitkeep
+  registry.pl
+schemas/
+  predicates.pl
+  modules.pl
+  migrations.pl
+tests/
+  kb/
+tools/
+  validate-kb
+  list-modules
+  list-predicates
+#+end_src
+
+=kb/core/= contains semantics shared by every domain. =kb/domains/= contains independently loadable domain modules. Generated runtime material is not committed as trusted canonical knowledge by default.
+
+* Module contract
+Every domain exposes one entry module named =star_kb_<domain>=. The module exports only supported public predicates. Internal helper predicates remain private.
+
+Each module declares metadata equivalent to:
+
+#+begin_src prolog
+kb_module(
+    module_id,
+    version,
+    [public_predicate/arity, ...],
+    [dependency_module_id, ...]
+).
+#+end_src
+
+A central registry makes module discovery possible without filesystem guessing.
+
+* Predicate compatibility
+Public predicates are contracts.
+
+- Predicate identity is =module + name + arity=.
+- Adding a new public predicate is backward-compatible.
+- Adding facts matching an existing predicate is data growth, not a schema change.
+- Changing argument meaning/order, removing a predicate, or changing result semantics requires a versioned migration.
+- Deprecated predicates remain queryable for a defined compatibility window and point to their replacement in the registry.
+- Validation rejects duplicate incompatible public declarations.
+
+* Fact trust classes
+Canonical storage distinguishes how knowledge entered the corpus:
+
+#+begin_src prolog
+asserted(FactId).     % deliberately curated canonical knowledge
+imported(FactId).     % transformed from an external source
+generated(FactId).    % machine-produced candidate knowledge
+#+end_src
+
+Derived Prolog conclusions are not reasserted as canonical facts merely because a rule can prove them. If derived results are materialized for performance, they belong to a cache/materialization layer with lineage back to rules and source facts.
+
+* Provenance model
+Externally sourced or generated facts MUST have provenance. The core model should support at least:
+
+#+begin_src prolog
+fact(FactId, Module, PredicateTerm).
+provenance(FactId, SourceId, ObservedAt, IngestedAt, Method).
+source(SourceId, SourceType, Locator, Metadata).
+#+end_src
+
+The exact physical representation may be optimized later, but the semantic contract is mandatory: consumers must be able to ask where a fact came from and whether it was asserted, imported, or generated.
+
+* Source registry
+Sources receive stable IDs independent of raw URLs. Repeated ingestion from the same logical source refers to the same source identity where possible. Source metadata can change without rewriting every fact.
+
+* Query-server boundary
+Actors SHOULD query Star KB through the Prolog query server. Direct file loading is reserved for tests, maintenance, and explicitly embedded/offline consumers.
+
+The server contract needs four conceptual operations:
+
+1. =modules= — list available modules and versions.
+2. =predicates(Module)= — list supported public predicates and documentation metadata.
+3. =query(Module, Goal, Options)= — execute a bounded query against an explicit module/dependency closure.
+4. =explain(Result)= — return provenance/derivation information when available.
+
+A request must identify the target module(s); unrestricted load-everything queries are not the default.
+
+* Query envelope
+A logical request contains:
+
+#+begin_src text
+request_id
+module
+module_version_constraint (optional)
+goal
+bindings / parameters
+limit
+timeout
+provenance_mode = none | sources | explain
+#+end_src
+
+A result contains:
+
+#+begin_src text
+request_id
+module_version
+solutions[]
+truncated
+provenance[] (when requested)
+error (typed, when failed)
+#+end_src
+
+Transport encoding is not fixed by this design; the semantic envelope should remain stable across HTTP, local IPC, Lisp wrappers, or later StarLang bindings.
+
+* Safety and bounded execution
+- Queries have an explicit timeout and solution limit.
+- Only exported/public predicates are remotely callable by default.
+- Arbitrary Prolog directives, filesystem access, shell execution, dynamic loading, and mutation are not part of the public query contract.
+- Module dependency closure is declared, not discovered by arbitrary runtime loading.
+- Write/ingest paths are separate from read/query paths.
+
+* Ingestion boundary
+New knowledge enters through an ingestion pipeline rather than ad-hoc actor writes:
+
+#+begin_src text
+producer -> normalize -> validate predicate/schema -> attach provenance -> stage -> verify -> promote
+#+end_src
+
+Generated or low-confidence material remains staged until policy/rules permit promotion. The initial slice only needs the structure and validator hooks; it does not need a full ingestion service.
+
+* Validation requirements
+Repository validation should fail on:
+- Prolog syntax errors.
+- Unknown module dependencies.
+- Duplicate/incompatible public predicate declarations.
+- Imported/generated facts missing required provenance.
+- Source IDs referenced but not registered.
+- Module tests failing.
+- Schema/version migrations missing for breaking predicate changes.
+
+* Actor integration contract
+Actors depend on semantic modules/predicates, not paths. An actor configuration should be able to declare requirements such as:
+
+#+begin_src text
+requires module: identity >= 1
+requires predicate: identity:person/2
+#+end_src
+
+The query service resolves the concrete loaded module. This keeps repository reorganization from breaking actor code.
+
+* StarLang integration
+StarLang should eventually compile or bind to the same module/predicate registry and query envelope. StarLang is therefore a consumer/authoring layer, not a second independent ontology. The Prolog contract remains authoritative until an explicitly approved migration changes that.
+
+* Neuro-symbolic integration
+Deep/neuro-symbolic systems may emit candidate facts or scores through the ingestion boundary. Their outputs are marked generated, provenance-bearing, and untrusted by default. Learned inference must not silently overwrite asserted facts.
+
+* First implementation slice after approval
+Only after explicit design approval:
+
+1. Create =kb/core/= and registry skeletons.
+2. Implement one tiny example domain module.
+3. Implement module/predicate discovery.
+4. Implement provenance structures.
+5. Add validation for module registration, exported predicates, and provenance completeness.
+6. Add query-server support for selecting one module and running a bounded exported predicate.
+7. Add tests proving private/arbitrary goals are rejected and provenance can be returned.
+
+Do NOT bulk-ingest data in this slice.
+
+* Acceptance criteria for the first implementation slice
+- A consumer can enumerate modules and public predicates.
+- A consumer can query a public predicate in one module through the query server.
+- A private or undeclared predicate cannot be called through the public interface.
+- A provenance-bearing fact can return its source.
+- An imported/generated fact lacking provenance fails validation.
+- Breaking public predicate changes require an explicit migration/version change.
+- Tests run locally and in repository CI.
+
+* Alternatives rejected
+** Actors load arbitrary KB files directly
+Rejected as the normal interface because it tightly couples actors to filesystem layout and makes compatibility/security boundaries difficult to enforce.
+
+** One monolithic Prolog file
+Rejected because the expected corpus is large, multi-domain, and independently evolving.
+
+** Store inferred conclusions as ordinary facts
+Rejected because it destroys the distinction between evidence and derivation and makes stale derived state hard to detect.
+
+** Let every actor define its own predicates
+Rejected because the point of Star KB is shared reusable semantics.
+
+* Approval
+| Stage | State | Requirement |
+|-------+-------+-------------|
+| Research | approved | Existing research direction accepted |
+| Design | pending | User must explicitly approve this document |
+| Implementation | blocked | No implementation work before design approval |
+
+* Changelog
+- 2026-09-10 :: Initial deep-design proposal created. Awaiting explicit approval.
