@@ -33,11 +33,12 @@ Research is approved for the initial dialect / KB direction. Deep design is the 
 | Implementation | blocked | Must not begin before design approval |
 
 * Approval Table
-| Stage | State | Evidence |
-|-------+-------+----------|
-| Research | approved | Initial shared-KB research direction accepted |
-| Design | pending | Review active deep-design note |
-| Implementation | blocked | Requires explicit design approval |
+| Approval area | Required authority | State | Evidence required | Evidence reference |
+|---------------+--------------------+-------+-------------------+--------------------|
+| Research | Project owner | APPROVED | Approved initial shared-KB research direction | dialect-and-kb-research.org |
+| Design | Project owner | PENDING | Explicit review of active deep design | prolog-kb-query-server-design.org |
+| Execution | Project owner | NOT STARTED | Approved bounded implementation slice | |
 
 * Changelog
 - 2026-09-10 :: Created initial Star KB project index and design gate.
+- 2026-09-10 :: Aligned approval state with the RAGE document contract.
