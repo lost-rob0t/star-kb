@@ -1,6 +1,0 @@
-#+title: Star KB implementation lane
-#+description: Approved implementation work only.
-#+filetags: :star-kb:implement:
-
-* Gate
-No active implementation is approved. Do not place implementation work here until the active design is explicitly approved.
