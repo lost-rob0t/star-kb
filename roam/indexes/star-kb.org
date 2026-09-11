@@ -1,0 +1,36 @@
+#+title: Star KB
+#+description: Project index and roadmap for the shared StarIntel Prolog knowledge-base corpus.
+#+filetags: :star-kb:index:
+:PROPERTIES:
+:ID: star-kb-index
+:STATUS: active
+:END:
+
+* Purpose
+Star KB is the shared, durable knowledge-base corpus used by StarIntel actors and services. It centralizes reusable Prolog facts, rules, modules, provenance, and query contracts so individual actors do not invent incompatible local schemas.
+
+* Current phase
+Research is approved for the initial dialect / KB direction. Deep design is the active gate. Implementation is not approved yet.
+
+* Active research
+- [[file:../research/star-kb/dialect-and-kb-research.org][Dialect and KB architecture research]]
+
+* Active design
+- [[file:../design/star-kb/prolog-kb-query-server-design.org][Prolog KB and query-server deep design]]
+
+* Roadmap
+1. Consolidate approved research into this repository.
+2. Review and approve the initial Prolog KB/query-server design.
+3. After explicit approval, implement the minimal queryable KB skeleton.
+4. Grow reusable domain modules and ingestion/provenance tooling incrementally.
+5. Integrate actors through the shared query contract rather than actor-specific schemas.
+
+* Gates
+| Gate | State | Requirement |
+|------+-------+-------------|
+| Research | approved | Initial architecture research accepted |
+| Design | pending | Explicit user approval required |
+| Implementation | blocked | Must not begin before design approval |
+
+* Changelog
+- 2026-09-10 :: Created initial Star KB project index and design gate.
