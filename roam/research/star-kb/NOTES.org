@@ -1,0 +1,6 @@
+#+title: Star KB research notes
+#+description: Reserved for follow-up research notes; implementation decisions belong in design after research is accepted.
+#+filetags: :star-kb:research:notes:
+
+* State
+No additional research pass is active in this bootstrap PR.
