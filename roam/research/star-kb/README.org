@@ -1,0 +1,8 @@
+#+title: Star KB research lane
+#+description: Research notes supporting the Star KB shared knowledge architecture.
+#+filetags: :star-kb:research:
+
+* Active baseline
+- [[file:dialect-and-kb-research.org][Dialect and shared Prolog KB research]]
+
+Research belongs here until its conclusions are stable enough to support a bounded design. Approved research does not itself authorize implementation.
