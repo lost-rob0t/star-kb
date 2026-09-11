@@ -1,6 +1,0 @@
-#+title: Star KB indexes
-#+description: Project indexes and roadmaps.
-#+filetags: :star-kb:index:
-
-* Projects
-- [[file:star-kb.org][Star KB]]
