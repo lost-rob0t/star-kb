@@ -1,9 +1,9 @@
 #+title: Star KB Prolog corpus and query-server deep design
 #+description: Reviewable design for the modular Prolog corpus, provenance model, predicate compatibility, validation, and query-server contract.
+#+status: pending-approval
 #+filetags: :star-kb:design:prolog:query-server:
 :PROPERTIES:
 :ID: star-kb-prolog-kb-query-server-design
-:STATUS: pending-approval
 :END:
 
 * Design status
@@ -223,7 +223,7 @@ Rejected because it destroys the distinction between evidence and derivation and
 ** Let every actor define its own predicates
 Rejected because the point of Star KB is shared reusable semantics.
 
-* Approval
+* Approval Table
 | Stage | State | Requirement |
 |-------+-------+-------------|
 | Research | approved | Existing research direction accepted |
