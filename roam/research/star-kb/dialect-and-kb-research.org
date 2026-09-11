@@ -1,0 +1,73 @@
+#+title: Star KB dialect and shared Prolog KB research
+#+description: Consolidated approved research direction for a shared StarIntel Prolog knowledge-base corpus and query-server access model.
+#+status: approved
+#+filetags: :star-kb:research:prolog:
+:PROPERTIES:
+:ID: star-kb-dialect-and-kb-research
+:END:
+
+* Research status
+This note records the already-approved research direction that motivated =star-kb=. It is research evidence and conclusions, not implementation authorization.
+
+* Problem
+StarIntel needs a large, durable body of reusable facts and rules that can be consumed by many actors without duplicating knowledge models or embedding actor-specific schemas everywhere.
+
+* Verified Facts
+- The intended canonical symbolic representation is Prolog facts and rules.
+- The corpus is intended to live in the dedicated =star-kb= repository rather than being duplicated inside individual actors.
+- StarIntel already has a Prolog query-server direction that can serve as the normal consumer boundary.
+- The expected corpus is large enough that it must be partitioned rather than treated as one monolithic file.
+- External observations need provenance so sourced data remains distinguishable from inference and manually curated knowledge.
+- StarLang is a separate Lisp-like language effort and is not yet the dependency on which the initial Star KB must rely.
+
+* Inference
+The evidence above implies the repository should be organized around independently loadable domain modules with stable public predicates. Actors should normally query those modules through a service contract instead of depending on filesystem layout. Learned systems and later StarLang tooling can then become producers or consumers of the same knowledge contract rather than introducing parallel incompatible ontologies.
+
+* Candidate execution layers considered
+** Prolog
+Best fit for the canonical fact/rule corpus and symbolic reasoning layer. It directly represents predicates, rules, constraints, and query semantics.
+
+** Lisp wrapper
+Useful as an integration/runtime layer around Prolog services and StarIntel actors where orchestration, service boundaries, or existing Common Lisp components are involved.
+
+** Star language
+A future candidate for higher-level authoring and orchestration as StarLang matures. Star KB should not depend on unfinished StarLang features for the initial corpus contract.
+
+** Deep / neuro-symbolic learning
+Useful as an enrichment or inference producer, not as a replacement for the canonical symbolic corpus. Learned outputs should enter through explicit provenance-bearing ingestion boundaries.
+
+* Research conclusions
+1. Maintain one shared, modular Prolog corpus in =star-kb=.
+2. Treat the Prolog query server as the normal consumer boundary.
+3. Separate canonical stored facts from derived/inferred results.
+4. Require provenance for externally sourced or generated facts.
+5. Make modules independently loadable and queryable.
+6. Keep actor-specific transport/orchestration outside the core knowledge representation.
+7. Design for StarLang and neuro-symbolic producers to integrate later without changing the meaning of existing predicates.
+
+* Contradictions
+No blocking contradiction has been identified in the approved direction. The main tension is future StarLang ownership versus a Prolog-first corpus: the current resolution is to keep the semantic contract independent enough that StarLang can bind to or author it later without making unfinished StarLang functionality a prerequisite now.
+
+* Unresolved Questions
+- Exact on-disk package/module layout.
+- Predicate naming, namespaces, and compatibility rules.
+- Provenance representation and source identity model.
+- Query-server module-selection and result-envelope contract.
+- Versioning and migration policy for predicates.
+- Validation/linting required before new knowledge enters the corpus.
+- How generated/inferred knowledge is quarantined or promoted.
+- How actors discover available modules and predicates.
+
+These questions are the input to the deep-design gate, not permission to implement.
+
+* Approval Table
+| Approval area | Required authority | State | Evidence required | Evidence reference |
+|---------------+--------------------+-------+-------------------+--------------------|
+| Research | Project owner | APPROVED | Sources and direction reviewed | prior approved Star KB research discussion |
+| Design | Project owner | PENDING | Deep design reviewed | ../../design/star-kb/prolog-kb-query-server-design.org |
+| Execution | Project owner | NOT STARTED | Approved bounded next action | |
+
+* Changelog
+- 2026-09-10 :: Consolidated the approved research direction into the correct =star-kb= research lane.
+- 2026-09-10 :: Aligned the note with the RAGE research document contract.
+- 2026-09-10 :: Aligned approval state with the RAGE approval-table schema.
