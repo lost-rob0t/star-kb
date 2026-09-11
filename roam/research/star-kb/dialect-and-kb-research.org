@@ -61,12 +61,13 @@ No blocking contradiction has been identified in the approved direction. The mai
 These questions are the input to the deep-design gate, not permission to implement.
 
 * Approval Table
-| Stage | State | Evidence |
-|-------+-------+----------|
-| Research | approved | User approved the shared-KB / Prolog-query-server research direction |
-| Design | pending | Deep design requires explicit review |
-| Implementation | blocked | No implementation until design approval |
+| Approval area | Required authority | State | Evidence required | Evidence reference |
+|---------------+--------------------+-------+-------------------+--------------------|
+| Research | Project owner | APPROVED | Sources and direction reviewed | prior approved Star KB research discussion |
+| Design | Project owner | PENDING | Deep design reviewed | ../../design/star-kb/prolog-kb-query-server-design.org |
+| Execution | Project owner | NOT STARTED | Approved bounded next action | |
 
 * Changelog
 - 2026-09-10 :: Consolidated the approved research direction into the correct =star-kb= research lane.
 - 2026-09-10 :: Aligned the note with the RAGE research document contract.
+- 2026-09-10 :: Aligned approval state with the RAGE approval-table schema.
