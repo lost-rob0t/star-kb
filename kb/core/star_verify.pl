@@ -7,17 +7,17 @@
 
 :- use_module(library(http/json)).
 
-:- multifile verification_document/11.
-:- multifile verification_policy/11.
+:- multifile verification_document/12.
+:- multifile verification_policy/12.
 :- multifile verification_source/2.
 :- multifile verification_evidence/4.
-:- multifile verification_vote/6.
+:- multifile verification_vote/7.
 
-:- dynamic verification_document/11.
-:- dynamic verification_policy/11.
+:- dynamic verification_document/12.
+:- dynamic verification_policy/12.
 :- dynamic verification_source/2.
 :- dynamic verification_evidence/4.
-:- dynamic verification_vote/6.
+:- dynamic verification_vote/7.
 
 valid_status(candidate).
 valid_status(generated).
@@ -30,16 +30,25 @@ non_empty_atom(Value) :-
     atom_length(Value, Length),
     Length > 0.
 
+hex_code(Code) :-
+    code_type(Code, xdigit).
+
+valid_sha256(Value) :-
+    atom(Value),
+    atom_length(Value, 64),
+    atom_codes(Value, Codes),
+    maplist(hex_code, Codes).
+
 verification_issue(Id, missing_document) :-
-    \+ verification_document(Id, _, _, _, _, _, _, _, _, _, _).
+    \+ verification_document(Id, _, _, _, _, _, _, _, _, _, _, _).
 
 verification_issue(Id, missing_policy) :-
-    verification_document(Id, _, _, _, _, _, _, _, _, _, _),
-    \+ verification_policy(Id, _, _, _, _, _, _, _, _, _, _).
+    verification_document(Id, _, _, _, _, _, _, _, _, _, _, _),
+    \+ verification_policy(Id, _, _, _, _, _, _, _, _, _, _, _).
 
 verification_issue(Id, invalid_document_identity) :-
     verification_document(Id, DType, Dataset, Schema, Version, _Actor, _RunId, _Method,
-                          _SpecId, _SpecVersion, _Status),
+                          _SpecId, _SpecVersion, _SpecDigest, _Status),
     ( \+ non_empty_atom(DType)
     ; \+ non_empty_atom(Dataset)
     ; \+ non_empty_atom(Schema)
@@ -49,39 +58,48 @@ verification_issue(Id, invalid_document_identity) :-
 
 verification_issue(Id, missing_provenance) :-
     verification_document(Id, _DType, _Dataset, _Schema, _Version, Actor, RunId, Method,
-                          _SpecId, _SpecVersion, _Status),
+                          _SpecId, _SpecVersion, _SpecDigest, _Status),
     ( \+ non_empty_atom(Actor)
     ; \+ non_empty_atom(RunId)
     ; \+ non_empty_atom(Method)
     ).
 
 verification_issue(Id, invalid_knowledge_status(Status)) :-
-    verification_document(Id, _, _, _, _, _, _, _, _, _, Status),
+    verification_document(Id, _, _, _, _, _, _, _, _, _, _, Status),
     \+ valid_status(Status).
 
 verification_issue(Id, schema_mismatch(Actual, Required)) :-
-    verification_document(Id, _, _, Actual, _, _, _, _, _, _, _),
-    verification_policy(Id, _, _, Required, _, _, _, _, _, _, _),
+    verification_document(Id, _, _, Actual, _, _, _, _, _, _, _, _),
+    verification_policy(Id, _, _, _, Required, _, _, _, _, _, _, _),
     Actual \= Required.
 
 verification_issue(Id, spec_mismatch(ActualId, ActualVersion, RequiredId, RequiredVersion)) :-
-    verification_document(Id, _, _, _, _, _, _, _, ActualId, ActualVersion, _),
-    verification_policy(Id, RequiredId, RequiredVersion, _, _, _, _, _, _, _, _),
+    verification_document(Id, _, _, _, _, _, _, _, ActualId, ActualVersion, _ActualDigest, _),
+    verification_policy(Id, RequiredId, RequiredVersion, _RequiredDigest, _, _, _, _, _, _, _, _),
     (ActualId \= RequiredId ; ActualVersion \= RequiredVersion).
 
+verification_issue(Id, invalid_spec_digest(ActualDigest)) :-
+    verification_document(Id, _, _, _, _, _, _, _, _, _, ActualDigest, _),
+    \+ valid_sha256(ActualDigest).
+
+verification_issue(Id, spec_digest_mismatch(ActualDigest, RequiredDigest)) :-
+    verification_document(Id, _, _, _, _, _, _, _, _, _, ActualDigest, _),
+    verification_policy(Id, _, _, RequiredDigest, _, _, _, _, _, _, _, _),
+    ActualDigest \= RequiredDigest.
+
 verification_issue(Id, verifier_mismatch(Actual)) :-
-    verification_policy(Id, _, _, _, _, _, _, _, _, _, Actual),
+    verification_policy(Id, _, _, _, _, _, _, _, _, _, _, Actual),
     Actual \= 'starintel-verify-v1'.
 
 verification_issue(Id, insufficient_sources(Count, Minimum)) :-
-    verification_policy(Id, _, _, _, _, _, _, Minimum, _, _, _),
+    verification_policy(Id, _, _, _, _, _, _, _, Minimum, _, _, _),
     findall(SourceId, verification_source(Id, SourceId), Sources),
     sort(Sources, Unique),
     length(Unique, Count),
     Count < Minimum.
 
 verification_issue(Id, insufficient_evidence(Count, Minimum)) :-
-    verification_policy(Id, _, _, _, _, _, _, _, Minimum, _, _),
+    verification_policy(Id, _, _, _, _, _, _, _, _, Minimum, _, _),
     findall(EvidenceId, verification_evidence(Id, EvidenceId, _, _), Evidence),
     sort(Evidence, Unique),
     length(Unique, Count),
@@ -109,12 +127,21 @@ verification_issue(Id, duplicate_evidence_id(EvidenceId)) :-
     Count > 1.
 
 verification_issue(Id, vote_spec_mismatch(Voter, VoteSpecId, VoteSpecVersion)) :-
-    verification_policy(Id, RequiredId, RequiredVersion, _, _, _, _, _, _, _, _),
-    verification_vote(Id, Voter, _Stance, _Weight, VoteSpecId, VoteSpecVersion),
+    verification_policy(Id, RequiredId, RequiredVersion, _RequiredDigest, _, _, _, _, _, _, _, _),
+    verification_vote(Id, Voter, _Stance, _Weight, VoteSpecId, VoteSpecVersion, _VoteSpecDigest),
     (VoteSpecId \= RequiredId ; VoteSpecVersion \= RequiredVersion).
 
+verification_issue(Id, vote_spec_digest_mismatch(Voter, VoteSpecDigest, RequiredDigest)) :-
+    verification_policy(Id, _, _, RequiredDigest, _, _, _, _, _, _, _, _),
+    verification_vote(Id, Voter, _Stance, _Weight, _VoteSpecId, _VoteSpecVersion, VoteSpecDigest),
+    VoteSpecDigest \= RequiredDigest.
+
+verification_issue(Id, invalid_vote_spec_digest(Voter, VoteSpecDigest)) :-
+    verification_vote(Id, Voter, _Stance, _Weight, _VoteSpecId, _VoteSpecVersion, VoteSpecDigest),
+    \+ valid_sha256(VoteSpecDigest).
+
 verification_issue(Id, invalid_vote(Voter, Stance, Weight)) :-
-    verification_vote(Id, Voter, Stance, Weight, _SpecId, _SpecVersion),
+    verification_vote(Id, Voter, Stance, Weight, _SpecId, _SpecVersion, _SpecDigest),
     ( \+ non_empty_atom(Voter)
     ; \+ valid_stance(Stance)
     ; \+ integer(Weight)
@@ -123,13 +150,13 @@ verification_issue(Id, invalid_vote(Voter, Stance, Weight)) :-
     ).
 
 verification_issue(Id, self_vote(Voter)) :-
-    verification_policy(Id, _, _, _, _, _, _, _, _, false, _),
-    verification_document(Id, _, _, _, _, Voter, _, _, _, _, _),
-    verification_vote(Id, Voter, _Stance, _Weight, _SpecId, _SpecVersion).
+    verification_policy(Id, _, _, _, _, _, _, _, _, _, false, _),
+    verification_document(Id, _, _, _, _, Voter, _, _, _, _, _, _),
+    verification_vote(Id, Voter, _Stance, _Weight, _SpecId, _SpecVersion, _SpecDigest).
 
 verification_issue(Id, duplicate_voter(Voter)) :-
-    verification_vote(Id, Voter, _, _, _, _),
-    findall(1, verification_vote(Id, Voter, _, _, _, _), Votes),
+    verification_vote(Id, Voter, _, _, _, _, _),
+    findall(1, verification_vote(Id, Voter, _, _, _, _, _), Votes),
     length(Votes, Count),
     Count > 1.
 
@@ -139,7 +166,7 @@ sum_weights([Weight|Rest], Total) :-
     Total is Weight + Tail.
 
 stance_weight(Id, Stance, Total) :-
-    findall(Weight, verification_vote(Id, _Voter, Stance, Weight, _SpecId, _SpecVersion), Weights),
+    findall(Weight, verification_vote(Id, _Voter, Stance, Weight, _SpecId, _SpecVersion, _SpecDigest), Weights),
     sum_weights(Weights, Total).
 
 vote_tally(Id, Approve, Reject, Abstain, Total) :-
@@ -149,25 +176,25 @@ vote_tally(Id, Approve, Reject, Abstain, Total) :-
     Total is Approve + Reject + Abstain.
 
 approval_count(Id, Count) :-
-    findall(Voter, verification_vote(Id, Voter, approve, _Weight, _SpecId, _SpecVersion), Voters),
+    findall(Voter, verification_vote(Id, Voter, approve, _Weight, _SpecId, _SpecVersion, _SpecDigest), Voters),
     length(Voters, Count).
 
 total_vote_count(Id, Count) :-
-    findall(Voter, verification_vote(Id, Voter, _Stance, _Weight, _SpecId, _SpecVersion), Voters),
+    findall(Voter, verification_vote(Id, Voter, _Stance, _Weight, _SpecId, _SpecVersion, _SpecDigest), Voters),
     length(Voters, Count).
 
 verification_issue(Id, insufficient_approvals(Count, Minimum)) :-
-    verification_policy(Id, _, _, _, Minimum, _, _, _, _, _, _),
+    verification_policy(Id, _, _, _, _, Minimum, _, _, _, _, _, _),
     approval_count(Id, Count),
     Count < Minimum.
 
 verification_issue(Id, insufficient_votes(Count, Minimum)) :-
-    verification_policy(Id, _, _, _, _, Minimum, _, _, _, _, _),
+    verification_policy(Id, _, _, _, _, _, Minimum, _, _, _, _, _),
     total_vote_count(Id, Count),
     Count < Minimum.
 
 verification_issue(Id, approval_ratio_below(Approve, Total, Numerator, Denominator)) :-
-    verification_policy(Id, _, _, _, _, _, ratio(Numerator, Denominator), _, _, _, _),
+    verification_policy(Id, _, _, _, _, _, _, ratio(Numerator, Denominator), _, _, _, _),
     vote_tally(Id, Approve, _Reject, _Abstain, Total),
     ( Total =:= 0
     ; Approve * Denominator < Total * Numerator
