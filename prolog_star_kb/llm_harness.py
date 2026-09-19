@@ -102,7 +102,7 @@ def _strings(value: Any) -> list[str]:
             if key in value:
                 result.extend(_strings(value[key]))
         for key, item in value.items():
-            if key not in preferred:
+            if key not in preferred and isinstance(item, (dict, list)):
                 result.extend(_strings(item))
         return result
     return []
