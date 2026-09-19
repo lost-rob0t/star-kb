@@ -108,12 +108,15 @@ if mode == "planner":
                 "id": "code",
                 "kind": "model",
                 "provider": "worker",
+                "agent_profile": "worker-code",
                 "prompt": "implement the bounded slice",
                 "depends_on": []
             }
         ]
     }))
 elif mode == "worker":
+    if "SPECIALIST_MARKER" not in prompt:
+        raise SystemExit(3)
     print("worker-ok")
 elif mode == "review":
     print(json.dumps({
@@ -240,10 +243,18 @@ class HarnessE2ETests(unittest.TestCase):
                     "role": "main",
                     "planner": "planner",
                     "allowed_providers": ["worker"],
+                    "worker_profiles": ["worker-code"],
                     "reviewers": ["review-gpt", "review-zai"],
-                    "max_parallel": 4,
+                    "max_plan_steps": 15,
+                    "max_parallel": 15,
+                    "queue_wait_seconds": 60,
                     "review_parallel": 2,
                     "review_policy": {"min_approvals": 2},
+                },
+                "worker-code": {
+                    "role": "worker",
+                    "provider": "worker",
+                    "instructions": "SPECIALIST_MARKER: implement code and tests.",
                 },
                 "review-gpt": {
                     "role": "reviewer",
@@ -309,6 +320,47 @@ class HarnessE2ETests(unittest.TestCase):
         self.assertEqual(error.exception.code, "subscription_rate_limited")
         self.assertEqual(limiter.calls, 2)
         self.assertEqual(dispatched, [])
+
+    def test_plan_step_limit_blocks_oversized_swarm(self):
+        with QuotaServer(quota_payload()) as server:
+            harness = StarIntelLLMHarness(self.config(server.url), repo_root=ROOT)
+            plan = {
+                "schema": "starintel.llm.plan.v1",
+                "goal": "too many workers",
+                "steps": [
+                    {
+                        "id": f"step-{index}",
+                        "kind": "model",
+                        "provider": "worker",
+                        "agent_profile": "worker-code",
+                        "prompt": "work",
+                        "depends_on": [],
+                    }
+                    for index in range(16)
+                ],
+            }
+            with self.assertRaises(HarnessError) as error:
+                harness.execute(plan, "main", wait_seconds=1)
+        self.assertEqual(error.exception.code, "plan_step_limit")
+
+    def test_worker_profile_provider_mismatch_is_rejected(self):
+        with QuotaServer(quota_payload()) as server:
+            harness = StarIntelLLMHarness(self.config(server.url), repo_root=ROOT)
+            plan = {
+                "schema": "starintel.llm.plan.v1",
+                "goal": "bad mapping",
+                "steps": [{
+                    "id": "step-1",
+                    "kind": "model",
+                    "provider": "review-zai-provider",
+                    "agent_profile": "worker-code",
+                    "prompt": "work",
+                    "depends_on": [],
+                }],
+            }
+            with self.assertRaises(HarnessError) as error:
+                harness.execute(plan, "main", wait_seconds=1)
+        self.assertIn(error.exception.code, {"plan_provider_not_allowed", "plan_worker_provider_mismatch"})
 
     def test_prolog_rejects_cycle(self):
         verifier = PrologVerifier(ROOT / "kb" / "core" / "star_llm_harness.pl")
