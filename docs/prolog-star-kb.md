@@ -7,18 +7,18 @@ The authoritative record remains canonical StarIntel JSON. The active StarIntel 
 ## Projection
 
 ```sh
-tools/prolog-star-kb project corpus.ndjson -o kb/generated/corpus.pl
+tools/prolog-star-kb project corpus.ndjson -o kb/generated/corpus.pl\n# Follow a newer additive release/profile explicitly:\ntools/prolog-star-kb project corpus.ndjson --manifest schemas/starintel-doc-v0.9.0.manifest.json -o kb/generated/corpus.pl
 ```
 
 Every JSON object, array, member, index, scalar, and type is emitted using JSON-Pointer paths. Semantic indexes are emitted in addition to the lossless path facts:
 
-- `star_doc/6`, `star_profile/5`
+- `star_doc/6`, `star_projection_input_hash/3`, `star_profile/5`
 - `star_ref/3`
 - `star_time/4`
 - `star_source/7`, `star_evidence/7`, `star_provenance/9`
 - `star_relation/9`, inverse predicates, and scalar qualifiers
 
-Unknown/additive JSON fields are therefore preserved automatically instead of waiting for converter code to learn every field.
+Unknown/additive JSON fields are therefore preserved automatically instead of waiting for converter code to learn every field. `star_doc/6` preserves the document's declared canonical `content_hash` when present; `star_projection_input_hash/3` separately hashes the exact projector input so replay integrity is not confused with canonical document identity.
 
 ## AI tools
 
