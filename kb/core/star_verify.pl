@@ -123,7 +123,7 @@ verification_issue(Id, invalid_vote(Voter, Stance, Weight)) :-
     ).
 
 verification_issue(Id, self_vote(Voter)) :-
-    verification_policy(Id, _, _, _, _, _, _, _, _, _, false),
+    verification_policy(Id, _, _, _, _, _, _, _, _, false, _),
     verification_document(Id, _, _, _, _, Voter, _, _, _, _, _),
     verification_vote(Id, Voter, _Stance, _Weight, _SpecId, _SpecVersion).
 
