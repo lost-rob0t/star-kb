@@ -69,6 +69,10 @@ verification_issue(Id, spec_mismatch(ActualId, ActualVersion, RequiredId, Requir
     verification_policy(Id, RequiredId, RequiredVersion, _, _, _, _, _, _, _, _),
     (ActualId \= RequiredId ; ActualVersion \= RequiredVersion).
 
+verification_issue(Id, verifier_mismatch(Actual)) :-
+    verification_policy(Id, _, _, _, _, _, _, _, _, _, Actual),
+    Actual \= 'starintel-verify-v1'.
+
 verification_issue(Id, insufficient_sources(Count, Minimum)) :-
     verification_policy(Id, _, _, _, _, _, _, Minimum, _, _, _),
     findall(SourceId, verification_source(Id, SourceId), Sources),
@@ -83,10 +87,26 @@ verification_issue(Id, insufficient_evidence(Count, Minimum)) :-
     length(Unique, Count),
     Count < Minimum.
 
+verification_issue(Id, evidence_missing_source(EvidenceId)) :-
+    verification_evidence(Id, EvidenceId, SourceId, _Status),
+    \+ non_empty_atom(SourceId).
+
 verification_issue(Id, evidence_unknown_source(EvidenceId, SourceId)) :-
     verification_evidence(Id, EvidenceId, SourceId, _Status),
     non_empty_atom(SourceId),
     \+ verification_source(Id, SourceId).
+
+verification_issue(Id, duplicate_source_id(SourceId)) :-
+    verification_source(Id, SourceId),
+    findall(1, verification_source(Id, SourceId), Matches),
+    length(Matches, Count),
+    Count > 1.
+
+verification_issue(Id, duplicate_evidence_id(EvidenceId)) :-
+    verification_evidence(Id, EvidenceId, _, _),
+    findall(1, verification_evidence(Id, EvidenceId, _, _), Matches),
+    length(Matches, Count),
+    Count > 1.
 
 verification_issue(Id, vote_spec_mismatch(Voter, VoteSpecId, VoteSpecVersion)) :-
     verification_policy(Id, RequiredId, RequiredVersion, _, _, _, _, _, _, _, _),
