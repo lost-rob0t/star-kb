@@ -102,7 +102,7 @@ class ProjectionTests(unittest.TestCase):
 class ToolTests(unittest.TestCase):
     def test_catalog_is_machine_readable(self) -> None:
         names = {tool["name"] for tool in tool_catalog()}
-        self.assertTrue({"kb_neighbors", "kb_path", "kb_explain", "kb_contradictions", "kb_route_reasoning", "kb_values", "kb_referrers", "kb_packet"} <= names)
+        self.assertTrue({"kb_neighbors", "kb_path", "kb_explain", "kb_contradictions", "kb_route_reasoning", "kb_values", "kb_referrers", "kb_packet", "kb_relation_maturity", "kb_linkage_neighbors", "kb_fact_history"} <= names)
 
     def test_compile_bounded_goal(self) -> None:
         goal = compile_tool_call("kb_path", {"source": "starintel:person:a", "target": "starintel:org:b", "max_depth": 5})
@@ -121,6 +121,31 @@ class ToolTests(unittest.TestCase):
     def test_depth_is_bounded(self) -> None:
         with self.assertRaises(ValueError):
             compile_tool_call("kb_path", {"source": "a", "target": "b", "max_depth": 1000})
+
+
+    def test_long_term_tools_are_bounded(self) -> None:
+        goal = compile_tool_call(
+            "kb_linkage_neighbors",
+            {"id": "starintel:person:a", "min_level": 3, "max_items": 20},
+        )
+        self.assertEqual(
+            "star_reasoning:tool_linkage_neighbors('starintel:person:a', 3, 20, Result)",
+            goal,
+        )
+        maturity = compile_tool_call(
+            "kb_relation_maturity",
+            {"subject": "a", "predicate": "works_for", "object": "b"},
+        )
+        self.assertEqual(
+            "star_reasoning:tool_relation_maturity('a', 'works_for', 'b', Result)",
+            maturity,
+        )
+        history = compile_tool_call("kb_fact_history", {"id": "a", "max_items": 10})
+        self.assertEqual("star_reasoning:tool_fact_history('a', 10, Result)", history)
+        with self.assertRaises(ValueError):
+            compile_tool_call("kb_linkage_neighbors", {"id": "a", "min_level": 6})
+        with self.assertRaises(ValueError):
+            compile_tool_call("kb_fact_history", {"id": "a", "max_items": 1000})
 
 
 class CliTests(unittest.TestCase):
