@@ -73,6 +73,7 @@ tools/star-kb-actors query-log \
 tools/star-kb-actors context --candidate starintel:relation:r1 --max-events 200
 
 tools/star-kb-actors verify starintel:relation:r1 \
+  --run-id verify-001 \
   --min-approvals 2 \
   --min-total-votes 2 \
   --approval-ratio 0.6666666667
@@ -104,7 +105,7 @@ the event log. Formal verification checks:
 - weighted approval ratio;
 - self-vote exclusion by default.
 
-LLM consensus cannot override a failed formal check.
+LLM consensus cannot override a failed formal check. Every formal decision is appended back to the event log as a verification certificate so later audits can replay the decision history.
 
 ## Query-log learning
 
