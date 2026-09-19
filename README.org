@@ -1,84 +1,86 @@
 #+title: Star KB
-#+description: Shared durable Prolog knowledge-base corpus and query contract for StarIntel.
+#+description: Deterministic StarIntel JSON-to-Prolog knowledge projection and bounded reasoning tools.
 
 * Star KB
 
-Star KB is the shared symbolic knowledge repository for StarIntel. It is built around modular Prolog facts and rules, explicit provenance, stable predicate contracts, and a query-server boundary that lets actors consume shared knowledge without coupling themselves to repository paths or inventing incompatible local schemas.
+Star KB is the shared symbolic reasoning layer for StarIntel.
 
-The repository uses the RAGE research/design/implementation workflow. Research creates evidence. Design turns approved research into a bounded implementation proposal. Implementation only begins after explicit design approval.
+*Canonical StarIntel JSON is authoritative.* Prolog is a deterministic, rebuildable projection used for logic, graph traversal, explanations, and AI/RLM tooling. This avoids maintaining two competing truth stores.
+
+The active StarIntel core release is =0.9.1= over the immutable =0.9.0= base schema. Projection metadata records release, schema, profile, revision, and expansion identity.
+
+* prolog-star-kb
+
+Project JSON/NDJSON:
+
+#+begin_src sh
+tools/prolog-star-kb project corpus.ndjson -o kb/generated/corpus.pl
+#+end_src
+
+List AI tool schemas:
+
+#+begin_src sh
+tools/prolog-star-kb tools
+#+end_src
+
+Compile a bounded tool call:
+
+#+begin_src sh
+tools/prolog-star-kb goal kb_path \
+  '{"source":"starintel:person:a","target":"starintel:org:b","max_depth":5}'
+#+end_src
+
+See =docs/prolog-star-kb.md= for the data and tool contracts.
+
+* Architecture
+
+#+begin_src text
+canonical StarIntel JSON
+          |
+          v
+  prolog-star-kb projector
+          |
+      +---+--------------------+
+      |                        |
+lossless JSON-Pointer facts    semantic indexes
+      |                        |
+      +-----------+------------+
+                  |
+          bounded Prolog API
+                  |
+       AI / RLM / actors / MCP / A2A / StarLang
+#+end_src
+
+Every JSON field remains queryable through path facts. Higher-value indexes add references, relations, time, evidence, sources, and provenance without throwing away unknown/additive fields.
+
+AI callers receive named bounded tools rather than arbitrary remote Prolog execution.
 
 * Repository shape
 
 #+begin_src text
-roam/research/      findings, source review, open questions
-roam/design/        implementation-ready designs awaiting approval
-roam/implement/     approved active implementation work
+prolog_star_kb/     projector + AI tool compiler
+kb/core/            Prolog projection/reasoning modules
+tools/              CLI entry points
+docs/               operator/data contracts
+roam/research/      findings and evidence
+roam/design/        canonical designs
+roam/implement/     promoted active implementation tracking
 roam/indexes/       project indexes and roadmaps
-scripts/            RAGE capture, promotion, status, sync, validation
-.github/workflows/  CI gates
-tests/              validator and workflow regression tests
+scripts/            RAGE workflow/validation
+tests/              regression coverage
 #+end_src
-
-The Org tree under =roam/= is the project control plane and source of truth for research/design state.
-
-* Current state
-
-The initial shared-KB research direction is approved. The first deep design covers:
-
-- modular Prolog corpus layout;
-- public predicate/module compatibility;
-- provenance and source identity;
-- bounded query-server access;
-- ingestion and trust classes;
-- actor, StarLang, and neuro-symbolic integration boundaries.
-
-Implementation is intentionally blocked until that design is explicitly approved.
-
-Start here:
-
-- =roam/indexes/star-kb.org=
-- =roam/research/star-kb/dialect-and-kb-research.org=
-- =roam/design/star-kb/prolog-kb-query-server-design.org=
 
 * RAGE loop
 
-1. *Analyze*: inspect current state, sources, constraints, contradictions, and unknowns.
-2. *Gate*: record what evidence or approval is required before execution.
-3. *Execute*: perform only the bounded action admitted by the gate.
-4. *Evaluate*: record observed output, tests, failures, and new evidence.
-5. *Recurse*: update state and begin the next loop from what actually happened.
+1. Analyze observed state.
+2. Gate execution explicitly.
+3. Execute only the approved slice.
+4. Verify with real evidence.
+5. Recurse from observed results.
 
-A green build is evidence. It is not approval by itself.
+The current approved slice is the JSON projection + reasoning-tool foundation. Bulk corpus ingestion is a separate gate.
 
-* Workflow commands
-
-Create a research note:
-
-#+begin_src sh
-python3 scripts/save-research.py \
-  --project star-kb \
-  --title "Investigation title" \
-  --description "What needs to be established" \
-  --draft
-#+end_src
-
-After a design is explicitly approved, promote it into the implementation slot:
-
-#+begin_src sh
-python3 scripts/implement.py roam/design/star-kb/<approved-design>.org
-#+end_src
-
-Record a terminal implementation result:
-
-#+begin_src sh
-python3 scripts/mark-design.py implemented \
-  --project star-kb \
-  --summary "Implemented the bounded slice" \
-  --file <path> \
-  --test "<verification command>"
-#+end_src
-
-Validate the repository:
+* Validation
 
 #+begin_src sh
 python3 scripts/sync.py
@@ -87,8 +89,4 @@ python3 scripts/validate-docs.py
 python3 -m unittest discover -s tests -p 'test_*.py' -v
 #+end_src
 
-* Document contract
-
-Substantive Org documents carry a stable ID, title, description, status, file tags, an approval table, and a changelog. Research notes distinguish observed facts, inference, contradictions, and unresolved questions.
-
-Do not load the entire corpus into an agent context for ordinary focused work. Load the active note, direct links, relevant index, source, and tests. Repository-wide audits are the exception.
+When SWI-Prolog is available, also load =kb/core/star_json.pl= and =kb/core/star_reasoning.pl= and run the Prolog smoke suite.
