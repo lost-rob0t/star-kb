@@ -88,6 +88,24 @@
       (generatedAt string :required)
       (runId string :required))))
 
+  (message audit-report
+    (:fields
+     ((auditId string :required)
+      (eventCount integer :required)
+      (eventTypes map :required)
+      (candidateCount integer :required)
+      (verificationDecisions map :required)
+      (verificationIssues map :required)
+      (voteDisagreements (list string) :optional)
+      (unverifiedCandidates (list string) :optional)
+      (rejectedCandidates (list string) :optional)
+      (specDriftCandidates (list string) :optional)
+      (queryCount integer :required)
+      (emptyResultQueryCount integer :required)
+      (toolUsage map :required)
+      (generatedAt string :required)
+      (runId string :required))))
+
   (message audit-finding
     (:fields
      ((findingId string :required)
