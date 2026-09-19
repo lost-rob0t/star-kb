@@ -19,7 +19,7 @@ from .projection import prolog_atom, prolog_term
 SPEC_ID = "org.starintel/kb-learning@1"
 SPEC_VERSION = "0.1.0"
 SPEC_PATH = Path(__file__).resolve().parents[1] / "spec" / "star-kb-learning.star"
-SPEC_DIGEST = hashlib.sha256(SPEC_PATH.read_bytes()).hexdigest()
+SPEC_DIGEST = "sha256:" + hashlib.sha256(SPEC_PATH.read_bytes()).hexdigest()
 DEFAULT_SCHEMA_VERSION = "0.9.0"
 
 
