@@ -5,6 +5,7 @@ import json
 import shutil
 import subprocess
 import tempfile
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from fractions import Fraction
@@ -453,6 +454,139 @@ def review_context(
         "queryObservations": queries,
         "generatedAt": generated_at,
         "runId": run_id,
+    }
+
+
+def audit_report(
+    store: EventStore,
+    *,
+    run_id: str,
+    max_ids: int = 1000,
+) -> dict[str, Any]:
+    if max_ids < 0 or max_ids > 10000:
+        raise ValueError("max_ids must be between 0 and 10000")
+
+    event_types: Counter[str] = Counter()
+    verification_issues: Counter[str] = Counter()
+    tool_usage: Counter[str] = Counter()
+    latest_candidates: dict[str, dict[str, Any]] = {}
+    latest_verifications: dict[str, dict[str, Any]] = {}
+    latest_votes_by_candidate: dict[str, dict[str, dict[str, Any]]] = {}
+    query_count = 0
+    empty_result_query_count = 0
+    event_count = 0
+    stream_hash = hashlib.sha256()
+
+    for event in store.events():
+        event_count += 1
+        event_type = str(event.get("eventType", "unknown"))
+        event_types[event_type] += 1
+        event_id_value = event.get("eventId")
+        if isinstance(event_id_value, str) and event_id_value:
+            stream_hash.update(event_id_value.encode("utf-8"))
+        else:
+            stream_hash.update(canonical_json(event).encode("utf-8"))
+        stream_hash.update(b"\n")
+
+        if event_type == "knowledge.candidate.proposed":
+            candidate_id = event.get("candidateId")
+            if isinstance(candidate_id, str) and candidate_id:
+                latest_candidates[candidate_id] = event
+            continue
+
+        if event_type == "knowledge.vote.cast":
+            candidate_id = event.get("candidateId")
+            voter = event.get("voter")
+            if isinstance(candidate_id, str) and candidate_id and isinstance(voter, str) and voter:
+                latest_votes_by_candidate.setdefault(candidate_id, {})[voter] = event
+            continue
+
+        if event_type == "knowledge.verification.completed":
+            candidate_id = event.get("candidateId")
+            if isinstance(candidate_id, str) and candidate_id:
+                latest_verifications[candidate_id] = event
+            for issue in event.get("issues", []) if isinstance(event.get("issues"), list) else []:
+                verification_issues[str(issue)] += 1
+            continue
+
+        if event_type == "knowledge.query.observed":
+            query_count += 1
+            tool = event.get("tool")
+            if isinstance(tool, str) and tool:
+                tool_usage[tool] += 1
+            result_ids = event.get("resultIds")
+            if isinstance(result_ids, list) and not result_ids:
+                empty_result_query_count += 1
+
+    candidate_ids = sorted(latest_candidates)
+    unverified = [
+        candidate_id
+        for candidate_id in candidate_ids
+        if candidate_id not in latest_verifications
+    ]
+    rejected = [
+        candidate_id
+        for candidate_id, event in sorted(latest_verifications.items())
+        if event.get("decision") == "rejected"
+    ]
+    spec_drift = [
+        candidate_id
+        for candidate_id, event in sorted(latest_candidates.items())
+        if event.get("specDigest") != SPEC_DIGEST
+    ]
+    disagreements: list[str] = []
+    for candidate_id, votes in sorted(latest_votes_by_candidate.items()):
+        stances = {vote.get("stance") for vote in votes.values()}
+        if "approve" in stances and "reject" in stances:
+            disagreements.append(candidate_id)
+
+    verification_decisions = Counter(
+        str(event.get("decision", "unknown"))
+        for event in latest_verifications.values()
+    )
+    generated_at = utc_now()
+    audit_basis = {
+        "streamHash": stream_hash.hexdigest(),
+        "specDigest": SPEC_DIGEST,
+        "candidateCount": len(latest_candidates),
+        "verificationCount": len(latest_verifications),
+        "queryCount": query_count,
+    }
+    return {
+        "auditId": "starintel:audit:" + content_hash(audit_basis),
+        "eventCount": event_count,
+        "eventTypes": dict(sorted(event_types.items())),
+        "candidateCount": len(latest_candidates),
+        "verificationDecisions": dict(sorted(verification_decisions.items())),
+        "verificationIssues": dict(sorted(verification_issues.items())),
+        "voteDisagreements": disagreements[:max_ids],
+        "unverifiedCandidates": unverified[:max_ids],
+        "rejectedCandidates": rejected[:max_ids],
+        "specDriftCandidates": spec_drift[:max_ids],
+        "truncated": {
+            "voteDisagreements": max(0, len(disagreements) - max_ids),
+            "unverifiedCandidates": max(0, len(unverified) - max_ids),
+            "rejectedCandidates": max(0, len(rejected) - max_ids),
+            "specDriftCandidates": max(0, len(spec_drift) - max_ids),
+        },
+        "queryCount": query_count,
+        "emptyResultQueryCount": empty_result_query_count,
+        "toolUsage": dict(sorted(tool_usage.items())),
+        "specId": SPEC_ID,
+        "specVersion": SPEC_VERSION,
+        "specDigest": SPEC_DIGEST,
+        "generatedAt": generated_at,
+        "runId": run_id,
+    }
+
+
+def audit_event(report: dict[str, Any]) -> dict[str, Any]:
+    payload = {"report": report, "runId": report["runId"]}
+    return {
+        "eventId": event_id("knowledge.audit.completed", payload),
+        "eventType": "knowledge.audit.completed",
+        "observedAt": utc_now(),
+        **payload,
     }
 
 
