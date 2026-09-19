@@ -241,6 +241,13 @@ class StarIntelLLMHarness:
             raise HarnessError(exc.code, exc.detail, exc.retry_after) from exc
 
         try:
+            decision = self.subscription.check(quota_provider)
+            if not decision.allowed:
+                raise HarnessError(
+                    "subscription_rate_limited",
+                    f"{quota_provider}: {decision.reason}",
+                    decision.retry_after,
+                )
             return self._run_provider(provider_name, provider, prompt)
         finally:
             self.local.release(quota_provider, token)
