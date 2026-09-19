@@ -1,0 +1,38 @@
+#+title: Star KB actor learning loop implementation
+#+description: Active implementation tracking for actor event replay, voting, query review context, StarLang contracts, and Prolog admission.
+#+status: active
+#+filetags: :star-kb:implement:actors:verification:
+:PROPERTIES:
+:ID: star-kb-actor-learning-loop-implementation
+:END:
+
+* Branch
+=feat/actor-learning-loop=
+
+* Implemented
+- StarLang learning protocol source under =spec/=.
+- Six actor contracts for ingest, review, voting, formal verification, audit, and optimization.
+- Append-only local event store.
+- Single and streaming NDJSON candidate staging.
+- Latest-vote replay semantics while preserving vote history.
+- Query observation logging and bounded review-context export.
+- Formal SWI-Prolog admission verifier.
+- Exact spec/version and schema adherence checks.
+- Source/evidence integrity and voting quorum checks.
+- CLI entry point =tools/star-kb-actors=.
+- Unit and SWI-Prolog integration tests.
+- Runtime event log excluded from Git.
+
+* Not implemented in this slice
+- LLM-provider invocation. Actors/runtime provide that externally.
+- Automatic promotion into canonical StarIntel JSON.
+- Distributed event-log storage.
+- Cryptographic actor signatures.
+- Generated downstream bindings until StarLang compiler emits the portable manifest for this spec-library through the final compiler surface.
+
+* Required verification
+- =python3 scripts/sync.py=
+- =python3 scripts/sync.py --check=
+- =python3 scripts/validate-docs.py=
+- =python3 -m unittest discover -s tests -p 'test_*.py' -v=
+- StarLang compiler validation of the =.star= sources.
