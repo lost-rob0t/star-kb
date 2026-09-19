@@ -2,7 +2,13 @@ name: validate
 
 on:
   push:
+    branches:
+      - main
   pull_request:
+
+concurrency:
+  group: validate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -15,10 +21,58 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
+      - name: Install SWI-Prolog
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y swi-prolog-nox
       - name: Compile scripts
-        run: python3 -m py_compile scripts/*.py
+        run: python3 -m py_compile scripts/*.py prolog_star_kb/*.py
       - name: Unit tests
         run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Prolog projection smoke test
+        run: |
+          cat > /tmp/star-kb-fixture.json <<'JSON'
+          {
+            "_id": "starintel:relation:ci",
+            "dataset": "ci",
+            "dtype": "relation",
+            "schema_version": "0.9.0",
+            "profile": "starintel-core",
+            "profile_version": "0.9.1",
+            "schema_revision": "0.9.0+fields.20260909.1",
+            "version": 1,
+            "sources": [
+              {
+                "source_id": "src-ci",
+                "kind": "test",
+                "url": "https://example.test/ci",
+                "credibility": 1.0,
+                "reliability": 1.0
+              }
+            ],
+            "evidence": [
+              {
+                "evidence_id": "ev-ci",
+                "source_id": "src-ci",
+                "role": "supporting",
+                "claim": "CI relation fixture.",
+                "confidence": 1.0,
+                "status": "verified"
+              }
+            ],
+            "data": {
+              "subject": "starintel:person:a",
+              "predicate": "works_for",
+              "object": "starintel:org:b",
+              "directed": true,
+              "confidence": 1.0
+            }
+          }
+          JSON
+          tools/prolog-star-kb project /tmp/star-kb-fixture.json -o /tmp/star-kb-fixture.pl
+          swipl -q \
+            -g "use_module('kb/core/star_json.pl'), use_module('kb/core/star_reasoning.pl'), star_json:load_projection('/tmp/star-kb-fixture.pl'), star_reasoning:tool_explain_relation('starintel:relation:ci', Explanation), nonvar(Explanation), halt(0)" \
+            -t "halt(1)"
       - name: Synchronize structure
         run: python3 scripts/sync.py
       - name: Check synchronization

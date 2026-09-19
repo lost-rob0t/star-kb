@@ -1,235 +1,209 @@
 #+title: Star KB Prolog corpus and query-server deep design
-#+description: Reviewable design for the modular Prolog corpus, provenance model, predicate compatibility, validation, and query-server contract.
-#+status: pending-approval
-#+filetags: :star-kb:design:prolog:query-server:
+#+description: Approved design for deterministic StarIntel JSON-to-Prolog projection, provenance-aware reasoning, predicate compatibility, and bounded AI query tools.
+#+status: approved
+#+filetags: :star-kb:design:prolog:query-server:projection:
 :PROPERTIES:
 :ID: star-kb-prolog-kb-query-server-design
 :END:
 
 * Design status
-This is a design artifact only. It MUST NOT be treated as approval to implement.
+Approved by the project owner on 2026-09-18 for the bounded =prolog-star-kb= implementation slice.
+
+* Canonical data boundary
+Canonical StarIntel JSON is the durable source of truth. Prolog is a deterministic symbolic projection used for reasoning, graph traversal, explanation, and AI tool execution.
+
+The active StarIntel core release is =0.9.1= while the immutable base schema remains =0.9.0=. A projection therefore records at least:
+
+- release version;
+- base schema version;
+- profile and profile version;
+- schema revision;
+- expansion-registry content hash.
+
+A Prolog projection must be disposable and rebuildable from canonical JSON. It must never become a second independently editable database.
 
 * Goals
-- Establish a durable repository layout for a large multi-domain Prolog corpus.
-- Give actors one stable query boundary rather than direct coupling to repository internals.
-- Preserve provenance and distinguish asserted, imported, generated, and inferred knowledge.
-- Permit predicates and modules to evolve without silently changing consumer semantics.
-- Make the corpus testable, discoverable, and incrementally loadable.
+- Deterministically project canonical StarIntel JSON/NDJSON into Prolog.
+- Preserve every JSON object, array, member, index, scalar value, scalar type, and path.
+- Add semantic indexes for high-value StarIntel concepts without making those indexes lossy.
+- Preserve source, evidence, provenance, temporal, reference, and relation semantics.
+- Give actors and AI agents bounded semantic tools instead of arbitrary remote Prolog evaluation.
+- Route reasoning by declared semantic capability instead of hard-coding one universal logic engine.
+- Keep generated/derived conclusions separate from canonical source facts.
+- Make projections replayable and attributable to the exact schema/profile contract.
 
-* Non-goals for the first implementation slice
+* Non-goals for this implementation slice
 - Bulk population of real-world facts.
 - A universal ontology covering every StarIntel domain.
-- Replacing the Prolog query server with StarLang.
-- Adding learned/neural inference to the trusted fact store.
-- Actor-specific convenience APIs.
+- Making Prolog the durable database.
+- Trusting model-generated hypotheses as canonical facts.
+- Selecting one logic engine as a universal winner.
+- Exposing unrestricted shell, filesystem, dynamic-loading, or arbitrary Prolog goals to remote AI callers.
+
+* Projection model
+The lossless layer uses JSON Pointer paths.
+
+#+begin_src prolog
+star_json_object(DocumentId, Path).
+star_json_array(DocumentId, Path, Length).
+star_json_member(DocumentId, ParentPath, Key, ChildPath).
+star_json_index(DocumentId, ParentPath, Index, ChildPath).
+star_json_value(DocumentId, Path, Type, Value).
+#+end_src
+
+This layer is schema-additive by construction: a new JSON field remains queryable even before a specialized semantic predicate is added.
+
+The semantic layer derives indexes such as:
+
+#+begin_src prolog
+star_doc(DocumentId, DType, Dataset, SchemaVersion, Version, ContentHash).
+star_profile(DocumentId, Profile, ProfileVersion, SchemaRevision, ReleaseVersion).
+star_ref(DocumentId, JsonPath, TargetId).
+star_time(DocumentId, Key, Value, JsonPath).
+star_source(DocumentId, SourceId, Kind, Locator, Credibility, Reliability, Hash).
+star_evidence(DocumentId, EvidenceId, SourceId, Role, Claim, Confidence, Status).
+star_provenance(DocumentId, Collector, Actor, Tool, Model, RunId, Method, ImportedFrom, Transform).
+star_relation(RelationId, Subject, Predicate, Object, Directed, Negated, Confidence, Start, End).
+#+end_src
+
+Semantic indexes may be regenerated at any time from the lossless/canonical source.
+
+* Determinism and identity
+Documents are emitted in stable =_id= order. Object keys are emitted in lexical order; array order is preserved. Projection content hashes use canonical JSON serialization.
+
+Projection metadata identifies the exact StarIntel contract used. Repeated projection of the same canonical input and manifest must produce byte-identical facts.
+
+* Relation model
+The relation projector supports the base v0.9 relation contract and additive v0.9.1 fields.
+
+It recognizes canonical =subject/predicate/object= and compatibility =source/target= endpoints. It also emits:
+
+- directed/undirected state;
+- negation;
+- confidence/weight;
+- temporal interval;
+- inverse predicate;
+- scalar relation qualifiers.
+
+Nested or future relation structures remain available through the lossless JSON-Pointer layer even when no semantic shortcut exists yet.
+
+* Provenance and trust
+Externally sourced or generated claims belong in canonical StarIntel JSON with source/evidence/provenance records.
+
+AI/RLM output is candidate knowledge. It can propose new StarIntel documents, claims, relations, or evidence, but must pass the normal normalize -> validate -> provenance -> review/promotion boundary before appearing in a future canonical projection.
+
+Derived Prolog conclusions are never silently asserted back into canonical JSON.
+
+* AI reasoning tools
+The initial AI surface is named and bounded:
+
+1. =kb_document= — document/profile identity.
+2. =kb_neighbors= — direct relation/reference neighborhood.
+3. =kb_path= — bounded graph path.
+4. =kb_explain= — relation + source + evidence + provenance + qualifiers.
+5. =kb_timeline= — temporal observations.
+6. =kb_contradictions= — explicit relation/evidence conflicts.
+7. =kb_compare= — shared relation/reference features.
+8. =kb_sources= — sources and provenance.
+9. =kb_why_not= — distinguish supported, explicitly negated, and missing direct claims.
+10. =kb_values= — query arbitrary scalar JSON-Pointer prefixes, including additive fields with no specialized semantic index.
+11. =kb_referrers= — reverse lookup of documents/paths that reference an entity.
+12. =kb_packet= — bounded RLM context packet containing identity, neighborhood, timeline, related source/provenance evidence, and contradictions.
+13. =kb_route_reasoning= — return a semantic reasoning capability.
+
+The tool compiler rejects unknown tool arguments and enforces bounded path depth. It does not accept raw caller-supplied Prolog goals.
+
+* Reasoning capability routing
+Following the approved ADARD logic-engine research, callers request semantics rather than engines.
+
+Initial capability names include:
+
+- =deterministic_rule_evaluation=
+- =deterministic_explanation=
+- =recursive_tabled_query=
+- =answer_set_or_tabled_explanation=
+- =probabilistic_query=
+- =recursive_probabilistic_query=
+- =bulk_datalog_closure=
+
+Runtime policy may map those capabilities to SWI-Prolog, N-Prolog, XSB/PITA, ProbLog/cplint, s(CASP), Soufflé, or later engines after benchmark/selection policy.
+
+* Actor, MCP, A2A, and StarLang boundary
+=prolog-star-kb= owns projection semantics and safe reasoning predicates.
+
+Actor, MCP, A2A, and StarLang adapters should generate or wrap the same AI tool catalog rather than reimplement ontology semantics. The same named tool should mean the same thing over actor, MCP, A2A, local Lisp, and StarLang surfaces.
+
+Skynet/RLM is a consumer and orchestrator of these tools. It may recursively branch investigations and choose capability routes, but remains downstream of canonical JSON/provenance rules.
+
+* Safety and bounded execution
+- Only exported semantic predicates are AI-callable.
+- Query depth and result count are bounded by caller/runtime policy.
+- Write/ingest paths remain separate from read/reason paths.
+- No shell, arbitrary directive, filesystem mutation, or unrestricted dynamic loading is part of the AI contract.
+- Unknown arguments fail closed.
+- Generated Prolog is cache/index state and must not contain secrets absent from canonical input.
 
 * Repository layout
 #+begin_src text
-kb/
-  core/
-    identity.pl
-    provenance.pl
-    time.pl
-    schema.pl
-  domains/
-    <domain>/
-      module.pl
-      facts/
-      rules/
-      tests/
-  sources/
-    source_registry.pl
-  generated/
-    .gitkeep
-  registry.pl
-schemas/
-  predicates.pl
-  modules.pl
-  migrations.pl
-tests/
-  kb/
-tools/
-  validate-kb
-  list-modules
-  list-predicates
+prolog_star_kb/          deterministic projector and tool compiler
+kb/core/star_json.pl     projection fact contract/loader
+kb/core/star_reasoning.pl bounded semantic reasoning predicates
+tools/prolog-star-kb     CLI
+docs/prolog-star-kb.md   operator contract
+tests/                   projection/tool tests
 #+end_src
 
-=kb/core/= contains semantics shared by every domain. =kb/domains/= contains independently loadable domain modules. Generated runtime material is not committed as trusted canonical knowledge by default.
+* Verification requirements
+- Same canonical input produces the same projection.
+- Active release/base-schema/profile/revision identity is recorded.
+- Unknown/additive JSON fields survive through JSON-Pointer facts.
+- Relation/source/evidence/provenance shortcuts are emitted.
+- AI tool schemas are machine-readable.
+- Tool-goal compilation rejects undeclared arguments.
+- Recursive graph depth is bounded.
+- Python tests pass.
+- Prolog modules load and smoke-test when SWI-Prolog is available.
+- Repository RAGE/docs checks remain green.
 
-* Module contract
-Every domain exposes one entry module named =star_kb_<domain>=. The module exports only supported public predicates. Internal helper predicates remain private.
+* Deferred enrichment
+After this slice is verified, the next design can add:
 
-Each module declares metadata equivalent to:
-
-#+begin_src prolog
-kb_module(
-    module_id,
-    version,
-    [public_predicate/arity, ...],
-    [dependency_module_id, ...]
-).
-#+end_src
-
-A central registry makes module discovery possible without filesystem guessing.
-
-* Predicate compatibility
-Public predicates are contracts.
-
-- Predicate identity is =module + name + arity=.
-- Adding a new public predicate is backward-compatible.
-- Adding facts matching an existing predicate is data growth, not a schema change.
-- Changing argument meaning/order, removing a predicate, or changing result semantics requires a versioned migration.
-- Deprecated predicates remain queryable for a defined compatibility window and point to their replacement in the registry.
-- Validation rejects duplicate incompatible public declarations.
-
-* Fact trust classes
-Canonical storage distinguishes how knowledge entered the corpus:
-
-#+begin_src prolog
-asserted(FactId).     % deliberately curated canonical knowledge
-imported(FactId).     % transformed from an external source
-generated(FactId).    % machine-produced candidate knowledge
-#+end_src
-
-Derived Prolog conclusions are not reasserted as canonical facts merely because a rule can prove them. If derived results are materialized for performance, they belong to a cache/materialization layer with lineage back to rules and source facts.
-
-* Provenance model
-Externally sourced or generated facts MUST have provenance. The core model should support at least:
-
-#+begin_src prolog
-fact(FactId, Module, PredicateTerm).
-provenance(FactId, SourceId, ObservedAt, IngestedAt, Method).
-source(SourceId, SourceType, Locator, Metadata).
-#+end_src
-
-The exact physical representation may be optimized later, but the semantic contract is mandatory: consumers must be able to ask where a fact came from and whether it was asserted, imported, or generated.
-
-* Source registry
-Sources receive stable IDs independent of raw URLs. Repeated ingestion from the same logical source refers to the same source identity where possible. Source metadata can change without rewriting every fact.
-
-* Query-server boundary
-Actors SHOULD query Star KB through the Prolog query server. Direct file loading is reserved for tests, maintenance, and explicitly embedded/offline consumers.
-
-The server contract needs four conceptual operations:
-
-1. =modules= — list available modules and versions.
-2. =predicates(Module)= — list supported public predicates and documentation metadata.
-3. =query(Module, Goal, Options)= — execute a bounded query against an explicit module/dependency closure.
-4. =explain(Result)= — return provenance/derivation information when available.
-
-A request must identify the target module(s); unrestricted load-everything queries are not the default.
-
-* Query envelope
-A logical request contains:
-
-#+begin_src text
-request_id
-module
-module_version_constraint (optional)
-goal
-bindings / parameters
-limit
-timeout
-provenance_mode = none | sources | explain
-#+end_src
-
-A result contains:
-
-#+begin_src text
-request_id
-module_version
-solutions[]
-truncated
-provenance[] (when requested)
-error (typed, when failed)
-#+end_src
-
-Transport encoding is not fixed by this design; the semantic envelope should remain stable across HTTP, local IPC, Lisp wrappers, or later StarLang bindings.
-
-* Safety and bounded execution
-- Queries have an explicit timeout and solution limit.
-- Only exported/public predicates are remotely callable by default.
-- Arbitrary Prolog directives, filesystem access, shell execution, dynamic loading, and mutation are not part of the public query contract.
-- Module dependency closure is declared, not discovered by arbitrary runtime loading.
-- Write/ingest paths are separate from read/query paths.
-
-* Ingestion boundary
-New knowledge enters through an ingestion pipeline rather than ad-hoc actor writes:
-
-#+begin_src text
-producer -> normalize -> validate predicate/schema -> attach provenance -> stage -> verify -> promote
-#+end_src
-
-Generated or low-confidence material remains staged until policy/rules permit promotion. The initial slice only needs the structure and validator hooks; it does not need a full ingestion service.
-
-* Validation requirements
-Repository validation should fail on:
-- Prolog syntax errors.
-- Unknown module dependencies.
-- Duplicate/incompatible public predicate declarations.
-- Imported/generated facts missing required provenance.
-- Source IDs referenced but not registered.
-- Module tests failing.
-- Schema/version migrations missing for breaking predicate changes.
-
-* Actor integration contract
-Actors depend on semantic modules/predicates, not paths. An actor configuration should be able to declare requirements such as:
-
-#+begin_src text
-requires module: identity >= 1
-requires predicate: identity:person/2
-#+end_src
-
-The query service resolves the concrete loaded module. This keeps repository reorganization from breaking actor code.
-
-* StarLang integration
-StarLang should eventually compile or bind to the same module/predicate registry and query envelope. StarLang is therefore a consumer/authoring layer, not a second independent ontology. The Prolog contract remains authoritative until an explicitly approved migration changes that.
-
-* Neuro-symbolic integration
-Deep/neuro-symbolic systems may emit candidate facts or scores through the ingestion boundary. Their outputs are marked generated, provenance-bearing, and untrusted by default. Learned inference must not silently overwrite asserted facts.
-
-* First implementation slice after approval
-Only after explicit design approval:
-
-1. Create =kb/core/= and registry skeletons.
-2. Implement one tiny example domain module.
-3. Implement module/predicate discovery.
-4. Implement provenance structures.
-5. Add validation for module registration, exported predicates, and provenance completeness.
-6. Add query-server support for selecting one module and running a bounded exported predicate.
-7. Add tests proving private/arbitrary goals are rejected and provenance can be returned.
-
-Do NOT bulk-ingest data in this slice.
-
-* Acceptance criteria for the first implementation slice
-- A consumer can enumerate modules and public predicates.
-- A consumer can query a public predicate in one module through the query server.
-- A private or undeclared predicate cannot be called through the public interface.
-- A provenance-bearing fact can return its source.
-- An imported/generated fact lacking provenance fails validation.
-- Breaking public predicate changes require an explicit migration/version change.
-- Tests run locally and in repository CI.
+- first-class MCP server generation;
+- Agent2Agent cards/tasks;
+- StarLang =kb= and =reason= hammers;
+- RLM evidence packets and recursive hypothesis/falsifier graphs;
+- probabilistic adapters;
+- tabled/path explanation with edge-level proof artifacts;
+- embedding/vector candidate retrieval feeding symbolic verification;
+- incremental projection/update indexes;
+- corpus sharding and distributed materialization.
 
 * Alternatives rejected
-** Actors load arbitrary KB files directly
-Rejected as the normal interface because it tightly couples actors to filesystem layout and makes compatibility/security boundaries difficult to enforce.
+** Prolog as a separately editable source database
+Rejected because it creates competing truth and replay problems.
 
-** One monolithic Prolog file
-Rejected because the expected corpus is large, multi-domain, and independently evolving.
+** Only semantic predicates
+Rejected because additive/future JSON fields would disappear until hand-mapped.
 
-** Store inferred conclusions as ordinary facts
-Rejected because it destroys the distinction between evidence and derivation and makes stale derived state hard to detect.
+** Only generic JSON path facts
+Rejected because agents would repeatedly reconstruct obvious StarIntel semantics and waste tokens/runtime.
 
-** Let every actor define its own predicates
-Rejected because the point of Star KB is shared reusable semantics.
+** Arbitrary Prolog tool
+Rejected because it destroys the bounded capability/security contract.
+
+** One universal logic engine
+Rejected by the approved ADARD engine-selection direction; engine selection is capability-specific.
 
 * Approval Table
 | Approval area | Required authority | State | Evidence required | Evidence reference |
 |---------------+--------------------+-------+-------------------+--------------------|
 | Research | Project owner | APPROVED | Approved shared-KB research direction | ../research/star-kb/dialect-and-kb-research.org |
-| Design | Project owner | PENDING | Explicit user approval of this design | this document |
-| Execution | Project owner | NOT STARTED | Approved bounded first implementation slice | |
+| Design | Project owner | APPROVED | Explicit user approval | 2026-09-18 conversation direction |
+| Execution | Project owner | APPROVED | Explicit request to implement =prolog-star-kb= JSON projection and AI reasoning tools | 2026-09-18 conversation direction |
+| Verification | Repository maintainer | PENDING | CI, repository validation, and Prolog smoke evidence | implementation branch/PR |
 
 * Changelog
-- 2026-09-10 :: Initial deep-design proposal created. Awaiting explicit approval.
-- 2026-09-10 :: Aligned approval state with the RAGE document contract.
+- 2026-09-10 :: Initial deep-design proposal created.
+- 2026-09-18 :: Project owner approved implementation direction.
+- 2026-09-18 :: Corrected canonical boundary: StarIntel JSON is authoritative; Prolog is deterministic symbolic projection.
+- 2026-09-18 :: Added lossless JSON-Pointer projection, semantic indexes, bounded AI tool surface, and reasoning-capability routing.
