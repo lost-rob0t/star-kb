@@ -1,6 +1,6 @@
 (actor research-ingest
   (:runtime native
-   :service-uri "star://starintel:localhost:star-kb/research-ingest"
+   :service-uri "star://starintel:localhost:research-ingest"
    :accepts (org.starintel/research-text@1)
    :produces (org.starintel/propose-knowledge@1)
    :handler research-ingest-handler

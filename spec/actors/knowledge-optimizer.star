@@ -1,6 +1,6 @@
 (actor knowledge-optimizer
   (:runtime native
-   :service-uri "star://starintel:localhost:star-kb/knowledge-optimizer"
+   :service-uri "star://starintel:localhost:knowledge-optimizer"
    :accepts (org.starintel/review-context@1 org.starintel/audit-finding@1)
    :produces (org.starintel/improvement-proposal@1)
    :handler knowledge-optimizer-handler
