@@ -32,6 +32,24 @@ tools/prolog-star-kb goal kb_path \
 
 See =docs/prolog-star-kb.md= for the data and tool contracts.
 
+* star-kb-actors
+
+The actor learning CLI stages model/research output as untrusted candidate knowledge, records votes and query traces, emits bounded review context, and delegates final admission to SWI-Prolog.
+
+#+begin_src sh
+tools/star-kb-actors init
+tools/star-kb-actors submit candidate.json --actor extractor-a --run-id run-1
+tools/star-kb-actors vote starintel:relation:r1 --actor reviewer-a --stance approve --run-id run-2
+tools/star-kb-actors context --candidate starintel:relation:r1
+tools/star-kb-actors verify starintel:relation:r1
+#+end_src
+
+Large LLM-generated NDJSON datasets can be streamed with =submit-batch=. This stages candidates only; it does not promote them into canonical truth.
+
+The canonical actor/message protocol is written in StarLang under =spec/=. Downstream libraries consume StarLang compiler manifests rather than maintaining parallel schemas. Formal admission rules live in =kb/core/star_verify.pl=.
+
+See =docs/star-kb-learning-loop.md=.
+
 * Architecture
 
 #+begin_src text
@@ -78,7 +96,7 @@ tests/              regression coverage
 4. Verify with real evidence.
 5. Recurse from observed results.
 
-The current approved slice is the JSON projection + reasoning-tool foundation. Bulk corpus ingestion is a separate gate.
+The approved slices are the JSON projection/reasoning foundation and the actor learning/admission loop. Bulk generated candidate staging is allowed; bulk canonical promotion remains a separate gate.
 
 * Validation
 
@@ -89,4 +107,4 @@ python3 scripts/validate-docs.py
 python3 -m unittest discover -s tests -p 'test_*.py' -v
 #+end_src
 
-When SWI-Prolog is available, also load =kb/core/star_json.pl= and =kb/core/star_reasoning.pl= and run the Prolog smoke suite.
+When SWI-Prolog is available, also load =kb/core/star_json.pl=, =kb/core/star_reasoning.pl=, and =kb/core/star_verify.pl= and run the Prolog smoke suite.
