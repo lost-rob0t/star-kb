@@ -15,6 +15,7 @@ from prolog_star_kb.actors import (
     SPEC_DIGEST,
     EventStore,
     VerificationPolicy,
+    audit_report,
     candidate_event,
     compile_verification_facts,
     query_event,
@@ -140,6 +141,45 @@ class ActorLearningTests(unittest.TestCase):
             report = run_prolog_verification(packet, repo_root=ROOT)
             self.assertEqual("verified", report["decision"])
             self.assertEqual([], report["issues"])
+
+    def test_audit_report_exposes_learning_signals_without_query_text(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            store = EventStore(Path(td) / "events.ndjson")
+            store.append(candidate_event(
+                fixture_document(),
+                proposed_by="extractor-a",
+                run_id="run-1",
+            ))
+            store.append(vote_event(
+                "starintel:relation:learning-test",
+                voter="reviewer-a",
+                stance="approve",
+                weight=1000,
+                run_id="run-2",
+            ))
+            store.append(vote_event(
+                "starintel:relation:learning-test",
+                voter="reviewer-b",
+                stance="reject",
+                weight=1000,
+                run_id="run-3",
+            ))
+            store.append(query_event(
+                actor="query-agent",
+                query="sensitive raw query text",
+                tool="kb_neighbors",
+                result_ids=[],
+                run_id="run-q",
+            ))
+            report = audit_report(store, run_id="audit-1")
+            self.assertEqual(1, report["candidateCount"])
+            self.assertEqual(1, report["queryCount"])
+            self.assertEqual(1, report["emptyResultQueryCount"])
+            self.assertEqual(
+                ["starintel:relation:learning-test"],
+                report["voteDisagreements"],
+            )
+            self.assertNotIn("sensitive raw query text", json.dumps(report))
 
     def test_verification_certificate_pins_policy_identity(self) -> None:
         with tempfile.TemporaryDirectory() as td:
