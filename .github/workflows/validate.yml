@@ -79,3 +79,17 @@ jobs:
         run: python3 scripts/sync.py --check
       - name: Validate research control plane
         run: python3 scripts/validate-docs.py
+
+  starlang-spec:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+      - name: Validate canonical StarLang learning protocol
+        env:
+          STARLANG_REF: github:lost-rob0t/star-lang/c9d56a38e04ef5cc1cfe90924da1551c7125bf3e
+        run: |
+          nix run "$STARLANG_REF" -- load "$PWD/spec/star-kb-learning.star"
+          for actor in spec/actors/*.star; do
+            nix run "$STARLANG_REF" -- check "$PWD/$actor"
+          done
