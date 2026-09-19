@@ -26,7 +26,7 @@ No bulk real-world ingestion is authorized in these slices.
 - =feature/long-term-linkage-kb=
 
 * Active implementation
-- [[file:../implement/star-kb-long-term-evidence.org][Long-term evidence maturity implementation]]
+- [[file:../implement/star-kb/long-term-evidence.org][Long-term evidence maturity implementation]]
 
 * Roadmap
 1. Verify deterministic JSON -> Prolog projection and safe AI tool compiler.
