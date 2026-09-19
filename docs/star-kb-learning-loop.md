@@ -37,9 +37,9 @@ formal Prolog verification
 promotion by a separate canonical-JSON write path
 ```
 
-The verifier decides whether a candidate satisfies the exact StarLang spec identity,
-canonical StarIntel schema version, provenance requirements, evidence requirements,
-and voting policy. A vote is evidence for admission; it is not proof by itself.
+The verifier decides whether a candidate satisfies the exact StarLang spec identity
+(ID, version, and SHA-256 source digest), canonical StarIntel schema version,
+provenance requirements, evidence requirements, and voting policy. A vote is evidence for admission; it is not proof by itself.
 
 ## Source of truth
 
@@ -71,6 +71,7 @@ tools/star-kb-actors query-log \
   --run-id query-001
 
 tools/star-kb-actors context --candidate starintel:relation:r1 --max-events 200
+tools/star-kb-actors audit --run-id audit-001
 
 tools/star-kb-actors verify starintel:relation:r1 \
   --run-id verify-001 \
@@ -94,7 +95,7 @@ and promotion remain independent gates.
 Only the latest vote per voter is active during replay. Historical votes remain in
 the event log. Formal verification checks:
 
-- exact `specId` and `specVersion` adherence;
+- exact `specId`, `specVersion`, and SHA-256 `specDigest` adherence;
 - exact required StarIntel schema version;
 - candidate/generated status only;
 - provenance actor, run ID, and method;
@@ -120,6 +121,10 @@ for reviewer, auditor, and optimizer actors. Those actors may propose:
 - new tests;
 - dataset cleanup;
 - spec revisions.
+
+The deterministic `audit` command summarizes unverified/rejected candidates,
+vote disagreement, verifier issue frequencies, empty-result queries, tool usage,
+and StarLang spec drift without copying raw query text into the audit report.
 
 Such output is candidate knowledge or an improvement proposal until it passes the
 appropriate review and verification gate.
