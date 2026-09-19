@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from prolog_star_kb.projection import load_documents, project_document, render_projection
+from prolog_star_kb.projection import ProjectionManifest, load_documents, project_document, prolog_atom, render_projection
 from prolog_star_kb.tools import compile_tool_call, tool_catalog
 
 
@@ -25,6 +25,7 @@ class ProjectionTests(unittest.TestCase):
             "profile_version": "0.9.1",
             "schema_revision": "0.9.0+fields.20260909.1",
             "version": 1,
+            "content_hash": "canonical-hash",
             "date_added": "2026-09-18T00:00:00Z",
             "sources": [{
                 "source_id": "src-1",
@@ -56,6 +57,8 @@ class ProjectionTests(unittest.TestCase):
     def test_projection_contains_lossless_and_semantic_facts(self) -> None:
         rendered = render_projection([self.doc])
         self.assertIn("star_projection_manifest('0.9.1', '0.9.0'", rendered)
+        self.assertIn("star_doc('starintel:relation:r1', 'relation', 'test', '0.9.0', 1, 'canonical-hash').", rendered)
+        self.assertIn("star_projection_input_hash('starintel:relation:r1', 'sha256-canonical-json'", rendered)
         self.assertIn("star_json_value('starintel:relation:r1', '/data/predicate', 'string', 'works_for').", rendered)
         self.assertIn("star_relation('starintel:relation:r1', 'starintel:person:ada', 'works_for', 'starintel:org:analytical-engines'", rendered)
         self.assertIn("star_source('starintel:relation:r1', 'src-1'", rendered)
@@ -72,6 +75,24 @@ class ProjectionTests(unittest.TestCase):
         self.assertEqual(2, len(load_documents(array)))
         ndjson = "\n".join(json.dumps(d) for d in [self.doc, {**self.doc, "_id": "starintel:relation:r2"}])
         self.assertEqual(2, len(load_documents(ndjson)))
+
+    def test_manifest_can_follow_future_additive_release(self) -> None:
+        manifest = ProjectionManifest.from_mapping({
+            "release_version": "0.9.2",
+            "schema_version": "0.9.0",
+            "profile": "starintel-core",
+            "profile_version": "0.9.2",
+            "schema_revision": "0.9.0+fields.test",
+            "expansion_content_hash": "future-hash",
+        })
+        rendered = render_projection([self.doc], manifest)
+        self.assertIn("star_projection_manifest('0.9.2', '0.9.0', 'starintel-core', '0.9.2'", rendered)
+
+    def test_prolog_atom_escapes_control_characters(self) -> None:
+        rendered = prolog_atom("a\x00b\n\t\b\f'\\")
+        self.assertNotIn("\x00", rendered)
+        self.assertIn("\\x0\\", rendered)
+        self.assertIn("\\n", rendered)
 
     def test_rejects_missing_identity(self) -> None:
         with self.assertRaises(ValueError):
