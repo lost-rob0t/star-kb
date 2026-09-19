@@ -81,11 +81,17 @@ class ProjectionTests(unittest.TestCase):
 class ToolTests(unittest.TestCase):
     def test_catalog_is_machine_readable(self) -> None:
         names = {tool["name"] for tool in tool_catalog()}
-        self.assertTrue({"kb_neighbors", "kb_path", "kb_explain", "kb_contradictions", "kb_route_reasoning"} <= names)
+        self.assertTrue({"kb_neighbors", "kb_path", "kb_explain", "kb_contradictions", "kb_route_reasoning", "kb_values", "kb_referrers", "kb_packet"} <= names)
 
     def test_compile_bounded_goal(self) -> None:
         goal = compile_tool_call("kb_path", {"source": "starintel:person:a", "target": "starintel:org:b", "max_depth": 5})
         self.assertEqual("star_reasoning:tool_path('starintel:person:a', 'starintel:org:b', 5, Result)", goal)
+
+    def test_compile_packet_goal_is_bounded(self) -> None:
+        goal = compile_tool_call("kb_packet", {"id": "starintel:person:a", "max_items": 30})
+        self.assertEqual("star_reasoning:tool_packet('starintel:person:a', 30, Result)", goal)
+        with self.assertRaises(ValueError):
+            compile_tool_call("kb_packet", {"id": "starintel:person:a", "max_items": 1000})
 
     def test_tool_does_not_accept_unknown_arguments(self) -> None:
         with self.assertRaises(ValueError):
