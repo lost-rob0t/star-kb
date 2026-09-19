@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
+import sqlite3
 import subprocess
 import tempfile
 from collections import Counter
@@ -40,19 +42,245 @@ def event_id(kind: str, payload: dict[str, Any]) -> str:
 
 
 class EventStore:
+    INDEX_VERSION = "1"
+
     def __init__(self, path: str | Path):
         self.path = Path(path)
+        self.index_path = self.path.with_suffix(self.path.suffix + ".sqlite3")
+
+    def _connect(self) -> sqlite3.Connection:
+        self.index_path.parent.mkdir(parents=True, exist_ok=True)
+        connection = sqlite3.connect(self.index_path)
+        connection.execute("PRAGMA journal_mode=WAL")
+        connection.execute("PRAGMA synchronous=NORMAL")
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS candidates (
+                candidate_id TEXT PRIMARY KEY,
+                event_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS votes (
+                candidate_id TEXT NOT NULL,
+                voter TEXT NOT NULL,
+                event_json TEXT NOT NULL,
+                PRIMARY KEY (candidate_id, voter)
+            );
+            CREATE TABLE IF NOT EXISTS verifications (
+                candidate_id TEXT PRIMARY KEY,
+                event_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS queries (
+                query_id TEXT PRIMARY KEY,
+                event_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS audits (
+                audit_id TEXT PRIMARY KEY,
+                event_json TEXT NOT NULL
+            );
+            """
+        )
+        return connection
+
+    @staticmethod
+    def _metadata(connection: sqlite3.Connection, key: str) -> str | None:
+        row = connection.execute(
+            "SELECT value FROM metadata WHERE key = ?",
+            (key,),
+        ).fetchone()
+        return None if row is None else str(row[0])
+
+    @staticmethod
+    def _set_metadata(connection: sqlite3.Connection, key: str, value: str) -> None:
+        connection.execute(
+            """
+            INSERT INTO metadata(key, value) VALUES(?, ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            """,
+            (key, value),
+        )
+
+    @staticmethod
+    def _apply_event(connection: sqlite3.Connection, event: dict[str, Any]) -> None:
+        event_type = event.get("eventType")
+        event_json = canonical_json(event)
+        if event_type == "knowledge.candidate.proposed":
+            candidate_id = event.get("candidateId")
+            if isinstance(candidate_id, str) and candidate_id:
+                connection.execute(
+                    """
+                    INSERT INTO candidates(candidate_id, event_json) VALUES(?, ?)
+                    ON CONFLICT(candidate_id) DO UPDATE SET event_json = excluded.event_json
+                    """,
+                    (candidate_id, event_json),
+                )
+            return
+        if event_type == "knowledge.vote.cast":
+            candidate_id = event.get("candidateId")
+            voter = event.get("voter")
+            if isinstance(candidate_id, str) and candidate_id and isinstance(voter, str) and voter:
+                connection.execute(
+                    """
+                    INSERT INTO votes(candidate_id, voter, event_json) VALUES(?, ?, ?)
+                    ON CONFLICT(candidate_id, voter) DO UPDATE SET event_json = excluded.event_json
+                    """,
+                    (candidate_id, voter, event_json),
+                )
+            return
+        if event_type == "knowledge.verification.completed":
+            candidate_id = event.get("candidateId")
+            if isinstance(candidate_id, str) and candidate_id:
+                connection.execute(
+                    """
+                    INSERT INTO verifications(candidate_id, event_json) VALUES(?, ?)
+                    ON CONFLICT(candidate_id) DO UPDATE SET event_json = excluded.event_json
+                    """,
+                    (candidate_id, event_json),
+                )
+            return
+        if event_type == "knowledge.query.observed":
+            query_id = event.get("queryId")
+            if isinstance(query_id, str) and query_id:
+                connection.execute(
+                    "INSERT OR REPLACE INTO queries(query_id, event_json) VALUES(?, ?)",
+                    (query_id, event_json),
+                )
+            return
+        if event_type == "knowledge.audit.completed":
+            report = event.get("report")
+            audit_id = report.get("auditId") if isinstance(report, dict) else None
+            if isinstance(audit_id, str) and audit_id:
+                connection.execute(
+                    "INSERT OR REPLACE INTO audits(audit_id, event_json) VALUES(?, ?)",
+                    (audit_id, event_json),
+                )
+
+    def _clear_index(self, connection: sqlite3.Connection) -> None:
+        for table in ("candidates", "votes", "verifications", "queries", "audits"):
+            connection.execute(f"DELETE FROM {table}")
+        self._set_metadata(connection, "index_version", self.INDEX_VERSION)
+        self._set_metadata(connection, "indexed_bytes", "0")
+
+    def _sync_index(self, connection: sqlite3.Connection) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.touch(exist_ok=True)
+        file_size = self.path.stat().st_size
+        version = self._metadata(connection, "index_version")
+        indexed_raw = self._metadata(connection, "indexed_bytes")
+        try:
+            indexed_bytes = int(indexed_raw or "0")
+        except ValueError:
+            indexed_bytes = -1
+
+        if version != self.INDEX_VERSION or indexed_bytes < 0 or indexed_bytes > file_size:
+            self._clear_index(connection)
+            connection.commit()
+            indexed_bytes = 0
+
+        if indexed_bytes == file_size:
+            return
+
+        with self.path.open("rb") as handle:
+            handle.seek(indexed_bytes)
+            while True:
+                raw = handle.readline()
+                if not raw:
+                    break
+                if not raw.endswith(b"\n"):
+                    raise ValueError("event log ends with an incomplete record")
+                value = json.loads(raw.decode("utf-8"))
+                if not isinstance(value, dict):
+                    raise ValueError("event log contains a non-object record")
+                self._apply_event(connection, value)
+            self._set_metadata(connection, "index_version", self.INDEX_VERSION)
+            self._set_metadata(connection, "indexed_bytes", str(handle.tell()))
+        connection.commit()
 
     def init(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.touch(exist_ok=True)
+        connection = self._connect()
+        try:
+            self._sync_index(connection)
+        finally:
+            connection.close()
+
+    def append_many(self, events: Iterable[dict[str, Any]], *, batch_size: int = 1000) -> int:
+        if batch_size < 1:
+            raise ValueError("batch_size must be positive")
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.touch(exist_ok=True)
+        connection = self._connect()
+        count = 0
+        try:
+            self._sync_index(connection)
+            with self.path.open("ab") as handle:
+                for event in events:
+                    if not isinstance(event, dict):
+                        raise TypeError("event must be a JSON object")
+                    encoded = (canonical_json(event) + "\n").encode("utf-8")
+                    handle.write(encoded)
+                    self._apply_event(connection, event)
+                    count += 1
+                    if count % batch_size == 0:
+                        handle.flush()
+                        os.fsync(handle.fileno())
+                        self._set_metadata(connection, "indexed_bytes", str(handle.tell()))
+                        self._set_metadata(connection, "index_version", self.INDEX_VERSION)
+                        connection.commit()
+                handle.flush()
+                os.fsync(handle.fileno())
+                self._set_metadata(connection, "indexed_bytes", str(handle.tell()))
+                self._set_metadata(connection, "index_version", self.INDEX_VERSION)
+                connection.commit()
+        finally:
+            connection.close()
+        return count
 
     def append(self, event: dict[str, Any]) -> dict[str, Any]:
-        self.init()
-        with self.path.open("a", encoding="utf-8") as handle:
-            handle.write(canonical_json(event))
-            handle.write("\n")
+        self.append_many((event,), batch_size=1)
         return event
+
+    def rebuild_index(self) -> None:
+        connection = self._connect()
+        try:
+            self._clear_index(connection)
+            connection.commit()
+            self._sync_index(connection)
+        finally:
+            connection.close()
+
+    def latest_candidate(self, candidate_id: str) -> dict[str, Any] | None:
+        connection = self._connect()
+        try:
+            self._sync_index(connection)
+            row = connection.execute(
+                "SELECT event_json FROM candidates WHERE candidate_id = ?",
+                (candidate_id,),
+            ).fetchone()
+        finally:
+            connection.close()
+        return None if row is None else json.loads(row[0])
+
+    def latest_votes(self, candidate_id: str) -> list[dict[str, Any]]:
+        connection = self._connect()
+        try:
+            self._sync_index(connection)
+            rows = connection.execute(
+                """
+                SELECT event_json
+                FROM votes
+                WHERE candidate_id = ?
+                ORDER BY voter
+                """,
+                (candidate_id,),
+            ).fetchall()
+        finally:
+            connection.close()
+        return [json.loads(row[0]) for row in rows]
 
     def events(self) -> Iterator[dict[str, Any]]:
         if not self.path.exists():
@@ -66,7 +294,6 @@ class EventStore:
                 if not isinstance(value, dict):
                     raise ValueError(f"event log line {line_number} is not a JSON object")
                 yield value
-
 
 def validate_candidate_document(document: dict[str, Any]) -> None:
     required = ("_id", "dataset", "dtype", "schema_version", "version", "provenance")
@@ -186,24 +413,14 @@ def query_event(
 
 
 def latest_candidate(store: EventStore, candidate_id: str) -> dict[str, Any]:
-    found: dict[str, Any] | None = None
-    for event in store.events():
-        if event.get("eventType") == "knowledge.candidate.proposed" and event.get("candidateId") == candidate_id:
-            found = event
+    found = store.latest_candidate(candidate_id)
     if found is None:
         raise KeyError(f"candidate not found: {candidate_id}")
     return found
 
 
 def latest_votes(store: EventStore, candidate_id: str) -> list[dict[str, Any]]:
-    votes: dict[str, dict[str, Any]] = {}
-    for event in store.events():
-        if event.get("eventType") != "knowledge.vote.cast" or event.get("candidateId") != candidate_id:
-            continue
-        voter = event.get("voter")
-        if isinstance(voter, str) and voter:
-            votes[voter] = event
-    return [votes[key] for key in sorted(votes)]
+    return store.latest_votes(candidate_id)
 
 
 @dataclass(frozen=True)
