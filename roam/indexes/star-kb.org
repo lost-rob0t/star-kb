@@ -19,6 +19,7 @@ Bulk generated candidate staging is authorized. Bulk canonical promotion or unco
 
 * Active research
 - [[file:../research/star-kb/dialect-and-kb-research.org][Dialect and KB architecture research]]
+- [[file:../research/star-kb/actor-learning-loop-research.org][Graph-memory, provenance, voting, and query-trace learning-loop research]]
 
 * Active design
 - [[file:../design/star-kb/prolog-kb-query-server-design.org][Prolog KB/query and JSON projection design]]
