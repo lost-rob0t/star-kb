@@ -1,0 +1,172 @@
+#+title: Star KB long-term evidence and linkage maturity
+#+description: Approved design for durable temporal/provenance reasoning, explicit-link maturity, contradiction visibility, and bounded agent tooling.
+#+status: approved
+#+filetags: :star-kb:design:prolog:long-term:evidence:linkage:
+:PROPERTIES:
+:ID: star-kb-long-term-evidence-linkage
+:END:
+
+* Design status
+Approved by the project owner on 2026-09-18 as an extension of the existing
+=prolog-star-kb= implementation.
+
+* Core invariant
+Canonical StarIntel JSON remains authoritative. Prolog remains deterministic,
+rebuildable symbolic state.
+
+The long-term layer may derive explanations, maturity, clusters, histories, and
+hypotheses. It must not silently promote derived output into canonical truth.
+
+* Why this layer exists
+StarIntel needs durable reasoning across years of observations without reducing
+the knowledge base to a flat pile of facts.
+
+The system therefore preserves:
+
+- what was observed;
+- when it was observed;
+- when it was believed valid;
+- which source supplied it;
+- which actor/tool/model transformed it;
+- which evidence supports or contradicts it;
+- which canonical relation expresses the claim;
+- how mature the evidence for that relation currently is;
+- why an agent reached a conclusion.
+
+* Explicit-link maturity levels
+Maturity describes the support state of a canonical link.
+
+| Level | Name | Meaning |
+|-------+----------------+----------------------------------------------------------|
+| 1 | referenced | A direct canonical reference exists |
+| 2 | asserted | A non-negated canonical relation exists |
+| 3 | sourced | At least one source or evidence record supports it |
+| 4 | corroborated | Multiple distinct sources and evidence records support it |
+| 5 | verified | Verified/confirmed evidence or qualifiers exist with source/evidence support |
+
+Maturity is not a person score. It does not represent guilt, dangerousness,
+intent, credibility of a person, or legal status.
+
+Contradiction never disappears. A mature relation can still be
+=contested(true)= when canonical counter-evidence exists.
+
+* Long-term temporal model
+The lossless projection already indexes temporal fields through =star_time/4=.
+Long-term reasoning treats time as first-class:
+
+- observation time;
+- collection/retrieval time;
+- relation validity interval;
+- source publication time;
+- verification/review time;
+- canonical document version.
+
+Future bitemporal projections may add explicit transaction-time and valid-time
+indexes, but must remain deterministic projections of canonical JSON.
+
+* Provenance graph
+Every externally sourced or generated claim should retain:
+
+#+begin_src text
+canonical document
+  -> source
+  -> evidence
+  -> provenance
+  -> actor/tool/model/run
+  -> transformation
+#+end_src
+
+Agent-generated hypotheses remain candidate knowledge until normal StarIntel
+promotion writes a canonical JSON record with provenance.
+
+* Agent/RLM use
+RLM/Skynet-style agents may:
+
+- request bounded evidence packets;
+- walk explicit relation/reference graphs;
+- compare source diversity;
+- inspect contradictions;
+- reason over temporal history;
+- branch hypotheses and falsifiers;
+- request additional actor collection;
+- explain why a relation is considered sourced/corroborated/verified.
+
+They may not receive an unrestricted remote Prolog evaluator.
+
+* Identity and people boundary
+This layer does not infer that two people/accounts are the same person merely
+because names, handles, emails, phones, locations, or other attributes resemble
+one another.
+
+Cross-source identity resolution, when appropriate, must enter through explicit
+canonical relations and provenance rather than an opaque person score.
+
+This keeps the KB useful for generic entities, accounts, organizations,
+documents, infrastructure, events, and consented user data without silently
+collapsing records.
+
+* Public tool contracts
+The extension adds:
+
+- =kb_relation_maturity=
+- =kb_linkage_neighbors=
+- =kb_fact_history=
+
+All calls are bounded and return explicit evidence state.
+
+* Modular Prolog layout
+#+begin_src text
+kb/core/star_json.pl       projection fact contract
+kb/core/star_reasoning.pl  stable bounded AI tool surface
+kb/core/star_longterm.pl   maturity/history/explicit-link semantics
+#+end_src
+
+Future modules should stay focused, for example:
+
+#+begin_src text
+star_temporal.pl
+star_hypothesis.pl
+star_provenance.pl
+star_policy.pl
+star_materialize.pl
+#+end_src
+
+Do not grow a universal catch-all module.
+
+* Future intelligence layers
+After verification, useful next slices are:
+
+1. Bitemporal =as_of= queries.
+2. Hypothesis/falsifier objects with proof traces.
+3. Source independence and provenance-path analysis.
+4. Incremental projection and invalidation.
+5. Sharded/distributed materialization.
+6. Vector candidate retrieval feeding symbolic verification.
+7. Actor collection plans generated from missing evidence.
+8. MCP/A2A/StarLang bindings generated from the same bounded tool catalog.
+9. Replayable explanation artifacts for every agent conclusion.
+
+Candidate retrieval may be probabilistic. Promotion to canonical truth remains
+an explicit StarIntel data action.
+
+* Verification requirements
+- Existing deterministic projection tests stay green.
+- New tool compilation bounds stay green.
+- SWI-Prolog loads =star_longterm.pl= with the existing projection.
+- CI demonstrates relation maturity and explicit-link neighbor queries.
+- Docs/RAGE synchronization stays green.
+- No bulk real-world corpus ingestion occurs in this slice.
+
+* Approval Table
+| Approval area | Required authority | State | Evidence reference |
+|---------------+--------------------+-------+--------------------|
+| Research | Project owner | APPROVED | Existing Star KB research direction |
+| Design | Project owner | APPROVED | 2026-09-18 request for long-term Prolog KB and linkage levels |
+| Execution | Project owner | APPROVED | 2026-09-18 request to implement in =star-kb= |
+| Bulk ingestion | Project owner | BLOCKED | Separate gate required |
+| Verification | Repository maintainer | PENDING | feature branch CI/PR |
+
+* Changelog
+- 2026-09-18 :: Approved long-term Prolog KB extension.
+- 2026-09-18 :: Defined five explicit-link evidence maturity levels.
+- 2026-09-18 :: Preserved contradiction visibility and bounded AI access.
