@@ -19,7 +19,7 @@ from prolog_star_kb.llm_harness import (
     StarIntelLLMHarness,
     provider_text,
 )
-from prolog_star_kb.llm_rate import LocalLeaseLimiter, RateLimitError, _window_decision
+from prolog_star_kb.llm_rate import LocalLeaseLimiter, RateDecision, RateLimitError, _window_decision
 
 
 class QuotaHandler(BaseHTTPRequestHandler):
@@ -283,6 +283,32 @@ class HarnessE2ETests(unittest.TestCase):
         self.assertTrue(result["accepted"])
         self.assertEqual(result["execution"]["steps"][0]["text"], "worker-ok")
         self.assertEqual([x["verdict"] for x in result["reviews"]], ["approve", "approve"])
+
+    def test_quota_is_rechecked_after_local_admission(self):
+        class SequencedLimiter:
+            def __init__(self):
+                self.calls = 0
+
+            def check(self, provider_id):
+                self.calls += 1
+                if self.calls == 1:
+                    return RateDecision(True, provider_id, "admitted")
+                return RateDecision(False, provider_id, "reserve_floor", 120)
+
+        with QuotaServer(quota_payload()) as server:
+            harness = StarIntelLLMHarness(self.config(server.url), repo_root=ROOT)
+            limiter = SequencedLimiter()
+            harness.subscription = limiter
+
+            dispatched = []
+            harness._run_provider = lambda *args: dispatched.append(args)
+
+            with self.assertRaises(HarnessError) as error:
+                harness.call("worker", "do not dispatch")
+
+        self.assertEqual(error.exception.code, "subscription_rate_limited")
+        self.assertEqual(limiter.calls, 2)
+        self.assertEqual(dispatched, [])
 
     def test_prolog_rejects_cycle(self):
         verifier = PrologVerifier(ROOT / "kb" / "core" / "star_llm_harness.pl")
