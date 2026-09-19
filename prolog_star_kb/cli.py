@@ -5,7 +5,7 @@ import json
 import sys
 from pathlib import Path
 
-from .projection import load_documents, render_projection
+from .projection import ProjectionManifest, load_documents, render_projection
 from .tools import compile_tool_call, tool_catalog
 
 
@@ -16,6 +16,7 @@ def main(argv: list[str] | None = None) -> int:
     project = sub.add_parser("project", help="project canonical StarIntel JSON/NDJSON into Prolog facts")
     project.add_argument("input", help="JSON/NDJSON file or - for stdin")
     project.add_argument("-o", "--output", help="output .pl file; defaults to stdout")
+    project.add_argument("--manifest", help="StarIntel schema release manifest JSON; defaults to the built-in current core manifest")
 
     sub.add_parser("tools", help="print AI tool definitions as JSON")
 
@@ -26,7 +27,13 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "project":
         text = sys.stdin.read() if args.input == "-" else Path(args.input).read_text(encoding="utf-8")
-        rendered = render_projection(load_documents(text))
+        manifest = ProjectionManifest()
+        if args.manifest:
+            raw_manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
+            if not isinstance(raw_manifest, dict):
+                raise SystemExit("manifest must be a JSON object")
+            manifest = ProjectionManifest.from_mapping(raw_manifest)
+        rendered = render_projection(load_documents(text), manifest)
         if args.output:
             Path(args.output).write_text(rendered, encoding="utf-8")
         else:
