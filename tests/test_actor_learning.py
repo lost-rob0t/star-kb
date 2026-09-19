@@ -139,11 +139,11 @@ class ActorLearningTests(unittest.TestCase):
             self.assertEqual(1, len(context["queryObservations"]))
 
     def test_spec_digest_matches_canonical_starlang_source(self) -> None:
-        expected = hashlib.sha256(
+        expected = "sha256:" + hashlib.sha256(
             (ROOT / "spec" / "star-kb-learning.star").read_bytes()
         ).hexdigest()
         self.assertEqual(expected, SPEC_DIGEST)
-        self.assertEqual(64, len(SPEC_DIGEST))
+        self.assertEqual(71, len(SPEC_DIGEST))
 
     def test_verification_facts_pin_exact_spec_and_policy(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -266,7 +266,7 @@ class ActorLearningTests(unittest.TestCase):
                 fixture_document(),
                 proposed_by="extractor-a",
                 run_id="run-1",
-                spec_digest="0" * 64,
+                spec_digest="sha256:" + ("0" * 64),
             ))
             for voter in ("reviewer-a", "reviewer-b"):
                 store.append(vote_event(
