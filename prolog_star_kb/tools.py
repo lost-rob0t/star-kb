@@ -33,6 +33,9 @@ TOOLS: tuple[Tool, ...] = (
     Tool("kb_compare", "Compare two entities by outgoing predicates, references, and canonical scalar values.", _object({"left": {"type": "string"}, "right": {"type": "string"}}, ["left", "right"]), "tool_compare"),
     Tool("kb_sources", "List provenance and source records supporting a document.", _object({"id": {"type": "string"}}, ["id"]), "tool_sources"),
     Tool("kb_why_not", "Explain which bounded conditions for a requested direct relation are missing or contradicted.", _object({"subject": {"type": "string"}, "predicate": {"type": "string"}, "object": {"type": "string"}}, ["subject", "predicate", "object"]), "tool_why_not"),
+    Tool("kb_values", "Read arbitrary canonical JSON scalar paths from the lossless projection, including additive fields unknown to semantic indexes.", _object({"id": {"type": "string"}, "path_prefix": {"type": "string"}}, ["id", "path_prefix"]), "tool_values"),
+    Tool("kb_referrers", "Find documents and JSON paths that reference a StarIntel ID.", _object({"target": {"type": "string"}}, ["target"]), "tool_referrers"),
+    Tool("kb_packet", "Build a compact reasoning packet for an entity: document identity, neighbors, timeline, sources/provenance, and contradictions.", _object({"id": {"type": "string"}, "max_items": {"type": "integer", "minimum": 1, "maximum": 100}}, ["id"]), "tool_packet"),
     Tool("kb_route_reasoning", "Choose a StarIntel reasoning capability route without exposing engine-specific syntax.", _object({"task": {"type": "string"}, "needs_uncertainty": {"type": "boolean"}, "needs_recursion": {"type": "boolean"}, "needs_explanation": {"type": "boolean"}, "bulk_graph": {"type": "boolean"}}, ["task"]), "tool_route_reasoning"),
 )
 
@@ -72,6 +75,15 @@ def compile_tool_call(name: str, arguments: dict[str, Any]) -> str:
         return f"star_reasoning:{tool.predicate}({prolog_term(arguments['relation_id'])}, Result)"
     if name in {"kb_timeline", "kb_contradictions", "kb_sources"}:
         return f"star_reasoning:{tool.predicate}({prolog_term(arguments['id'])}, Result)"
+    if name == "kb_values":
+        return f"star_reasoning:{tool.predicate}({prolog_term(arguments['id'])}, {prolog_term(arguments['path_prefix'])}, Result)"
+    if name == "kb_referrers":
+        return f"star_reasoning:{tool.predicate}({prolog_term(arguments['target'])}, Result)"
+    if name == "kb_packet":
+        max_items = int(arguments.get("max_items", 25))
+        if not 1 <= max_items <= 100:
+            raise ValueError("max_items must be between 1 and 100")
+        return f"star_reasoning:{tool.predicate}({prolog_term(arguments['id'])}, {max_items}, Result)"
     if name == "kb_compare":
         return f"star_reasoning:{tool.predicate}({prolog_term(arguments['left'])}, {prolog_term(arguments['right'])}, Result)"
     if name == "kb_why_not":
