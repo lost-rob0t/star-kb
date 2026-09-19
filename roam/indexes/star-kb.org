@@ -10,18 +10,23 @@
 Star KB is the shared symbolic reasoning layer used by StarIntel actors and services. Canonical StarIntel JSON remains authoritative; Star KB deterministically projects that corpus into modular Prolog facts and safe reasoning tools.
 
 * Current phase
-Research and the Prolog projection/query design are approved. The active bounded implementation is =prolog-star-kb=: canonical JSON -> lossless Prolog facts + semantic indexes + AI reasoning tools.
+Research plus the Prolog projection/query and actor-learning-loop designs are approved. Active bounded implementation now includes:
 
-No bulk real-world ingestion is authorized in this slice.
+- =prolog-star-kb=: canonical JSON -> lossless Prolog facts + semantic indexes + AI reasoning tools.
+- =star-kb-actors=: append-only candidate/query replay, actor voting, bounded review context, StarLang protocol source, and formal Prolog admission.
+
+Bulk generated candidate staging is authorized. Bulk canonical promotion or uncontrolled real-world ingestion remains blocked.
 
 * Active research
 - [[file:../research/star-kb/dialect-and-kb-research.org][Dialect and KB architecture research]]
 
 * Active design
 - [[file:../design/star-kb/prolog-kb-query-server-design.org][Prolog KB/query and JSON projection design]]
+- [[file:../design/star-kb/actor-learning-loop-design.org][Actor learning loop, voting, StarLang contracts, and formal verification]]
 
 * Implementation branch
 - =feature/prolog-star-kb-projection=
+- =feat/actor-learning-loop=
 
 * Roadmap
 1. Verify deterministic JSON -> Prolog projection and safe AI tool compiler.
@@ -31,15 +36,18 @@ No bulk real-world ingestion is authorized in this slice.
 5. Add StarLang =kb=, =reason=, and RLM bindings.
 6. Add engine adapters chosen by semantic capability.
 7. Grow domain semantic indexes without sacrificing lossless generic projection.
-8. Only then begin controlled corpus ingestion/materialization.
+8. Run the actor learning loop over generated candidate datasets and query logs.
+9. Generate downstream bindings from the canonical StarLang learning protocol.
+10. Only then begin controlled canonical corpus promotion/materialization.
 
 * Gates
 | Gate | State | Requirement |
 |------+-------+-------------|
 | Research | approved | Initial architecture research accepted |
 | Design | approved | Project owner approved JSON-projection design |
-| Implementation | active | Bounded =prolog-star-kb= slice only |
-| Bulk ingestion | blocked | Requires separate explicit gate |
+| Implementation | active | =prolog-star-kb= plus approved =star-kb-actors= learning-loop slice |
+| Generated candidate staging | approved | NDJSON candidates remain untrusted until verification |
+| Bulk canonical promotion | blocked | Requires separate explicit gate |
 
 * Approval Table
 | Approval area | Required authority | State | Evidence required | Evidence reference |
@@ -47,9 +55,11 @@ No bulk real-world ingestion is authorized in this slice.
 | Research | Project owner | APPROVED | Approved initial shared-KB research direction | dialect-and-kb-research.org |
 | Design | Project owner | APPROVED | Explicit review/approval | prolog-kb-query-server-design.org |
 | Execution | Project owner | APPROVED | Explicit request to implement =prolog-star-kb= | feature/prolog-star-kb-projection |
+| Actor learning execution | Project owner | APPROVED | Explicit actor CLI + voting/spec/Prolog/StarLang request | feat/actor-learning-loop |
 | Verification | Repository maintainer | PENDING | CI and runtime verification | implementation PR |
 
 * Changelog
 - 2026-09-10 :: Created initial Star KB project index and design gate.
 - 2026-09-18 :: Recorded explicit approval and active =prolog-star-kb= implementation slice.
 - 2026-09-18 :: Clarified canonical JSON -> deterministic Prolog projection architecture.
+- 2026-09-18 :: Approved actor learning loop, voting, exact spec adherence, formal Prolog verification, and StarLang-owned protocol source.
