@@ -26,6 +26,7 @@
       (proposedBy string :required)
       (specId string :required)
       (specVersion string :required)
+      (specDigest string :required)
       (knowledgeStatus knowledge-status :required)
       (runId string :required))))
 
@@ -37,6 +38,7 @@
       (weight integer :required)
       (specId string :required)
       (specVersion string :required)
+      (specDigest string :required)
       (reasons (list string) :optional)
       (evidenceIds (list string) :optional)
       (runId string :required))))
@@ -46,12 +48,17 @@
      ((candidateId string :required)
       (specId string :required)
       (specVersion string :required)
+      (specDigest string :required)
       (policy map :required)
       (runId string :required))))
 
   (message verification-result
     (:fields
      ((candidateId string :required)
+      (specId string :required)
+      (specVersion string :required)
+      (specDigest string :required)
+      (verifier string :required)
       (decision verification-decision :required)
       (issues (list string) :optional)
       (approveWeight integer :required)
