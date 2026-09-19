@@ -207,6 +207,63 @@ class StarIntelLLMHarness:
             raise HarnessError("provider_missing", name)
         return value
 
+    def _worker_profile_catalog(self, main_profile: dict[str, Any]) -> dict[str, dict[str, Any]]:
+        names = main_profile.get("worker_profiles") or []
+        if not isinstance(names, list) or not all(isinstance(name, str) and name for name in names):
+            raise HarnessError("worker_profiles_invalid")
+
+        allowed = main_profile.get("allowed_providers")
+        if not isinstance(allowed, list) or not all(isinstance(item, str) for item in allowed):
+            raise HarnessError("profile_allowed_providers_invalid")
+        allowset = set(allowed)
+
+        catalog: dict[str, dict[str, Any]] = {}
+        for name in names:
+            worker = self.profile(name)
+            if worker.get("role") != "worker":
+                raise HarnessError("worker_profile_role_invalid", name)
+            provider = worker.get("provider")
+            if not isinstance(provider, str) or provider not in allowset:
+                raise HarnessError("worker_profile_provider_invalid", name)
+            instructions = worker.get("instructions", "")
+            if not isinstance(instructions, str):
+                raise HarnessError("worker_profile_instructions_invalid", name)
+            catalog[name] = {
+                "provider": provider,
+                "instructions": instructions,
+            }
+        return catalog
+
+    def _validate_plan_policy(self, plan: dict[str, Any], profile_name: str) -> None:
+        profile = self.profile(profile_name)
+        allowed = profile.get("allowed_providers")
+        if not isinstance(allowed, list) or not all(isinstance(item, str) for item in allowed):
+            raise HarnessError("profile_allowed_providers_invalid", profile_name)
+
+        steps = plan.get("steps")
+        if not isinstance(steps, list):
+            raise HarnessError("plan_steps_invalid")
+        max_steps = int(profile.get("max_plan_steps", 32))
+        if max_steps < 1:
+            raise HarnessError("max_plan_steps_invalid", profile_name)
+        if len(steps) > max_steps:
+            raise HarnessError("plan_step_limit", f"{len(steps)} > {max_steps}")
+
+        allowset = set(allowed)
+        workers = self._worker_profile_catalog(profile)
+        for step in steps:
+            if not isinstance(step, dict) or step.get("provider") not in allowset:
+                raise HarnessError("plan_provider_not_allowed")
+            worker_name = step.get("agent_profile")
+            if workers and not isinstance(worker_name, str):
+                raise HarnessError("plan_worker_profile_required")
+            if worker_name is None:
+                continue
+            if not isinstance(worker_name, str) or worker_name not in workers:
+                raise HarnessError("plan_worker_profile_invalid", str(worker_name))
+            if workers[worker_name]["provider"] != step.get("provider"):
+                raise HarnessError("plan_worker_provider_mismatch", worker_name)
+
     def check_rate(self, provider_name: str):
         provider = self.provider(provider_name)
         quota_provider = provider.get("quota_provider")
@@ -307,27 +364,36 @@ class StarIntelLLMHarness:
         if not isinstance(allowed, list) or not all(isinstance(item, str) for item in allowed):
             raise HarnessError("profile_allowed_providers_invalid", profile_name)
 
+        workers = self._worker_profile_catalog(profile)
+        max_steps = int(profile.get("max_plan_steps", 32))
+        worker_contract = ""
+        if workers:
+            public_workers = {
+                name: {"provider": worker["provider"], "instructions": worker["instructions"]}
+                for name, worker in workers.items()
+            }
+            worker_contract = (
+                " Every step must contain agent_profile chosen from this trusted worker catalog, "
+                "and its provider must match that profile: "
+                f"{json.dumps(public_workers, ensure_ascii=False)}."
+            )
+
         prompt = (
             "You are StarIntel's planning worker. Return exactly one JSON object and no prose. "
             f'Use schema "{PLAN_SCHEMA}". '
             "Every step must contain id, kind='model', provider, prompt, depends_on. "
+            f"Use at most {max_steps} steps. "
             "The graph must be acyclic and providers must come from this allowlist: "
-            f"{json.dumps(allowed)}. Goal: {goal}"
+            f"{json.dumps(allowed)}."
+            f"{worker_contract} Goal: {goal}"
         )
         result = self.call(planner, prompt, wait_seconds)
         plan = typed_json(result.text, PLAN_SCHEMA)
         if plan.get("goal") != goal:
             raise HarnessError("plan_goal_mismatch")
 
-        steps = plan.get("steps")
-        if not isinstance(steps, list):
-            raise HarnessError("plan_steps_invalid")
-        allowset = set(allowed)
-        for step in steps:
-            if not isinstance(step, dict) or step.get("provider") not in allowset:
-                raise HarnessError("plan_provider_not_allowed")
-
         self.verifier.verify(plan)
+        self._validate_plan_policy(plan, profile_name)
         return plan
 
     def execute(
@@ -337,6 +403,7 @@ class StarIntelLLMHarness:
         wait_seconds: float = 0,
     ) -> dict[str, Any]:
         self.verifier.verify(plan)
+        self._validate_plan_policy(plan, profile_name)
         profile = self.profile(profile_name)
         max_parallel = max(1, int(profile.get("max_parallel", 1)))
         steps = {step["id"]: step for step in plan["steps"]}
@@ -386,11 +453,21 @@ class StarIntelLLMHarness:
             for dep in step.get("depends_on", [])
         }
         prompt = str(step["prompt"])
+        worker_name = step.get("agent_profile")
+        if isinstance(worker_name, str):
+            worker = self.profile(worker_name)
+            instructions = worker.get("instructions", "")
+            if instructions:
+                prompt = (
+                    f"Trusted StarIntel worker profile: {worker_name}\n"
+                    f"{instructions}\n\nAssigned task:\n{prompt}"
+                )
         if dependencies:
             prompt += "\n\nDependency results:\n" + json.dumps(dependencies, ensure_ascii=False)
         result = self.call(str(step["provider"]), prompt, wait_seconds)
         return {
             "id": step["id"],
+            "agent_profile": step.get("agent_profile"),
             "provider": result.provider,
             "text": result.text,
             "elapsed_ms": result.elapsed_ms,
@@ -480,16 +557,23 @@ def _main(argv: list[str] | None = None) -> int:
     plan = sub.add_parser("plan")
     plan.add_argument("goal")
     plan.add_argument("--profile", default="main")
-    plan.add_argument("--wait-seconds", type=float, default=0)
+    plan.add_argument("--wait-seconds", type=float)
 
     run = sub.add_parser("run")
     run.add_argument("goal")
     run.add_argument("--profile", default="main")
-    run.add_argument("--wait-seconds", type=float, default=0)
+    run.add_argument("--wait-seconds", type=float)
 
     args = parser.parse_args(argv)
     config = load_config(args.config)
     harness = StarIntelLLMHarness(config)
+
+    wait_seconds = getattr(args, "wait_seconds", None)
+    profile_name = getattr(args, "profile", None)
+    if wait_seconds is None and isinstance(profile_name, str):
+        wait_seconds = float(harness.profile(profile_name).get("queue_wait_seconds", 0))
+    if wait_seconds is None:
+        wait_seconds = 0.0
 
     if args.command == "profiles":
         print(json.dumps(config["profiles"], ensure_ascii=False, indent=2))
@@ -510,13 +594,13 @@ def _main(argv: list[str] | None = None) -> int:
         return 0 if decision.allowed else 75
     if args.command == "plan":
         print(json.dumps(
-            harness.plan(args.goal, args.profile, args.wait_seconds),
+            harness.plan(args.goal, args.profile, wait_seconds),
             ensure_ascii=False,
             indent=2,
         ))
         return 0
     if args.command == "run":
-        result = harness.run(args.goal, args.profile, args.wait_seconds)
+        result = harness.run(args.goal, args.profile, wait_seconds)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0 if result["accepted"] else 3
     return 2

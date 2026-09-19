@@ -88,6 +88,16 @@ Profiles are data. A typical config defines:
 
 More worker/reviewer profiles can be added without changing harness code.
 
+A main profile may advertise a trusted `worker_profiles` list. A plan step can
+select one through `agent_profile`, but the host requires that profile to have
+`role=worker`, requires its configured provider to match the step's explicit
+provider, and injects the profile instructions at execution time. Planner text
+cannot create a new trusted profile or widen its provider mapping.
+
+Main profiles can also set `max_plan_steps`, `max_parallel`, and
+`queue_wait_seconds`. This allows a broad logical swarm while provider
+concurrency and subscription pacing remain independent hard limits.
+
 ## Subscription pacing
 
 The harness does **not** guess a quota from a plan name such as "Pro" or
@@ -125,13 +135,15 @@ python3 -m prolog_star_kb.llm_harness profiles
 python3 -m prolog_star_kb.llm_harness quota
 python3 -m prolog_star_kb.llm_harness check-rate codex-plan
 python3 -m prolog_star_kb.llm_harness plan --profile main "goal"
-python3 -m prolog_star_kb.llm_harness run --profile main --wait-seconds 300 "goal"
+python3 -m prolog_star_kb.llm_harness run --profile main "goal"
 ```
 
 The repo also provides `tools/starintel-llm`; installing/exposing that script as
 an executable is a packaging concern rather than a second implementation.
 
-Exit status `75` means admission/rate limiting prevented a provider call.
+When `--wait-seconds` is omitted, the CLI uses the selected profile's
+`queue_wait_seconds`. An explicit flag overrides it. Exit status `75` means
+admission/rate limiting prevented a provider call after the permitted wait.
 
 ## Security properties
 
