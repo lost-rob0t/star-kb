@@ -27,9 +27,9 @@ tools/prolog-star-kb tools
 tools/prolog-star-kb goal kb_path '{"source":"starintel:person:a","target":"starintel:org:b","max_depth":5}'
 ```
 
-The tool catalog exposes bounded semantic operations rather than arbitrary Prolog execution: document lookup, graph neighbors/path, relation explanation, timeline, contradictions, comparison, sources/provenance, why-not, and capability routing.
+The tool catalog exposes bounded semantic operations rather than arbitrary Prolog execution: document lookup, graph neighbors/path, relation explanation, timeline, contradictions, comparison, sources/provenance, why-not, arbitrary lossless JSON-path value lookup, reverse referrers, compact reasoning packets, and capability routing.
 
-`kb_route_reasoning` returns a reasoning capability, not an engine name. Runtime policy can map deterministic rules, probabilistic queries, recursive tabled queries, explanation, and bulk Datalog closure to the selected engine.
+`kb_packet` is the RLM-friendly fast path: it returns a bounded bundle of identity, neighborhood, timeline, related sources/provenance, and contradictions. `kb_route_reasoning` returns a reasoning capability, not an engine name. Runtime policy can map deterministic rules, probabilistic queries, recursive tabled queries, explanation, and bulk Datalog closure to the selected engine.
 
 ## Trust boundary
 
