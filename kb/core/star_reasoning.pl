@@ -13,10 +13,14 @@
             tool_route_reasoning/6,
             tool_values/3,
             tool_referrers/2,
-            tool_packet/3
+            tool_packet/3,
+            tool_relation_maturity/4,
+            tool_linkage_neighbors/4,
+            tool_fact_history/3
           ]).
 
 :- use_module(star_json).
+:- use_module(star_longterm, []).
 
 % Graph edges preserve whether they came from an explicit relation or a generic
 % StarIntel reference. Relation edges carry the relation document as evidence.
@@ -146,3 +150,15 @@ tool_packet(Id, MaxItems,
     findall(Time, tool_timeline(Id, Time), Time0), sort(Time0, Time1), take_at_most(MaxItems, Time1, Timeline),
     findall(Source, related_source(Id, Source), Source0), sort(Source0, Source1), take_at_most(MaxItems, Source1, Sources),
     findall(Conflict, tool_contradictions(Id, Conflict), Conflict0), sort(Conflict0, Conflict1), take_at_most(MaxItems, Conflict1, Contradictions).
+
+
+% Long-term KB wrappers keep the AI surface in one stable module while the
+% implementation stays modular.
+tool_relation_maturity(Subject, Predicate, Object, Result) :-
+    star_longterm:tool_relation_maturity(Subject, Predicate, Object, Result).
+
+tool_linkage_neighbors(Entity, MinLevel, MaxItems, Result) :-
+    star_longterm:tool_linkage_neighbors(Entity, MinLevel, MaxItems, Result).
+
+tool_fact_history(Entity, MaxItems, Result) :-
+    star_longterm:tool_fact_history(Entity, MaxItems, Result).
