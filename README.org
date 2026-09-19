@@ -55,11 +55,15 @@ Every JSON field remains queryable through path facts. Higher-value indexes add 
 
 AI callers receive named bounded tools rather than arbitrary remote Prolog execution.
 
+The long-term layer adds explicit-link evidence maturity, contradiction flags,
+and bounded history queries. Link levels measure support for canonical
+relations; they do not silently merge identities or score people.
+
 * Repository shape
 
 #+begin_src text
 prolog_star_kb/     projector + AI tool compiler
-kb/core/            Prolog projection/reasoning modules
+kb/core/            Prolog projection/reasoning + long-term evidence modules
 tools/              CLI entry points
 docs/               operator/data contracts
 roam/research/      findings and evidence
