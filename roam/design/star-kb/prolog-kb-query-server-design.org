@@ -106,7 +106,10 @@ The initial AI surface is named and bounded:
 7. =kb_compare= — shared relation/reference features.
 8. =kb_sources= — sources and provenance.
 9. =kb_why_not= — distinguish supported, explicitly negated, and missing direct claims.
-10. =kb_route_reasoning= — return a semantic reasoning capability.
+10. =kb_values= — query arbitrary scalar JSON-Pointer prefixes, including additive fields with no specialized semantic index.
+11. =kb_referrers= — reverse lookup of documents/paths that reference an entity.
+12. =kb_packet= — bounded RLM context packet containing identity, neighborhood, timeline, related source/provenance evidence, and contradictions.
+13. =kb_route_reasoning= — return a semantic reasoning capability.
 
 The tool compiler rejects unknown tool arguments and enforces bounded path depth. It does not accept raw caller-supplied Prolog goals.
 
