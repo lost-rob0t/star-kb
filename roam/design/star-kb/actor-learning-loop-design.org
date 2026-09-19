@@ -48,9 +48,9 @@ LLMs may generate very large candidate datasets, but model output remains candid
 - =knowledge-optimizer=: turn query/audit evidence into bounded improvement proposals.
 
 * Exact specification adherence
-Every candidate and vote names an exact =specId= and =specVersion=. The verifier rejects:
-- candidate/spec mismatch;
-- vote/spec mismatch;
+Every candidate and vote names an exact =specId=, =specVersion=, and SHA-256 =specDigest= of the canonical StarLang source. The verifier rejects:
+- candidate/spec ID, version, or source-digest mismatch;
+- vote/spec ID, version, or source-digest mismatch;
 - wrong StarIntel schema version;
 - wrong verifier contract identity;
 - missing canonical identity/provenance requirements.
@@ -90,7 +90,10 @@ No arbitrary caller-supplied Prolog goal is accepted.
 * Query-log learning
 The CLI can record query text, bounded tool arguments, result IDs, result hash, actor, run ID, and timestamp.
 
-Reviewer/auditor/optimizer actors consume bounded =review-context= packets built from replay. They may propose schema/index/rule/test/dataset improvements, but those proposals remain candidates until their own applicable gates pass.
+The deterministic =audit= pass first summarizes verifier failures, vote disagreement,
+unverified/rejected candidates, empty-result query rate, tool usage, and spec drift
+without duplicating raw query text. Reviewer/auditor/optimizer actors consume that
+summary plus bounded =review-context= packets built from replay. They may propose schema/index/rule/test/dataset improvements, but those proposals remain candidates until their own applicable gates pass.
 
 * Bulk generated datasets
 =submit-batch= streams NDJSON candidate documents into the event log without materializing the entire dataset in memory.
