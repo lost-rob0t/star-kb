@@ -13,6 +13,8 @@ from .actors import (
     SPEC_VERSION,
     EventStore,
     VerificationPolicy,
+    audit_event,
+    audit_report,
     candidate_event,
     iter_ndjson,
     query_event,
@@ -124,6 +126,10 @@ def main(argv: list[str] | None = None) -> int:
     context.add_argument("--candidate")
     context.add_argument("--max-events", type=int, default=200)
     context.add_argument("--run-id", default="review")
+
+    audit = sub.add_parser("audit", help="summarize query, vote, verification, and spec-drift signals")
+    audit.add_argument("--max-ids", type=int, default=1000)
+    audit.add_argument("--run-id", required=True)
 
     verify = sub.add_parser("verify", help="formally verify candidate admission in SWI-Prolog")
     verify.add_argument("candidate_id")
@@ -239,6 +245,11 @@ def main(argv: list[str] | None = None) -> int:
             max_events=args.max_events,
             run_id=args.run_id,
         ))
+        return 0
+    if args.command == "audit":
+        report = audit_report(store, run_id=args.run_id, max_ids=args.max_ids)
+        store.append(audit_event(report))
+        _dump(report)
         return 0
     if args.command in {"verify", "packet"}:
         policy = _policy(args)
