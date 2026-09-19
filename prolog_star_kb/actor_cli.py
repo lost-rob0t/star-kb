@@ -17,6 +17,7 @@ from .actors import (
     query_event,
     review_context,
     run_prolog_verification,
+    verification_event,
     verification_packet,
     vote_event,
 )
@@ -131,6 +132,7 @@ def main(argv: list[str] | None = None) -> int:
     verify.add_argument("--min-evidence", type=int, default=1)
     verify.add_argument("--allow-self-vote", action="store_true")
     verify.add_argument("--swipl", default="swipl")
+    verify.add_argument("--run-id", required=True)
 
     packet = sub.add_parser("packet", help="emit the exact packet that formal verification will consume")
     packet.add_argument("candidate_id")
@@ -234,7 +236,9 @@ def main(argv: list[str] | None = None) -> int:
             _dump(value)
             return 0
         result = run_prolog_verification(value, repo_root=ROOT, swipl=args.swipl)
-        _dump(result)
+        certificate = verification_event(value, result, run_id=args.run_id)
+        store.append(certificate)
+        _dump({**result, "verificationEventId": certificate["eventId"]})
         return 0 if result.get("decision") == "verified" else 1
     return 2
 
