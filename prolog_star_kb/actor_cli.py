@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .actors import (
     DEFAULT_SCHEMA_VERSION,
+    SPEC_DIGEST,
     SPEC_ID,
     SPEC_VERSION,
     EventStore,
@@ -49,6 +50,7 @@ def _policy(args: argparse.Namespace) -> VerificationPolicy:
         approval_ratio=args.approval_ratio,
         spec_id=args.spec_id,
         spec_version=args.spec_version,
+        spec_digest=args.spec_digest,
         required_schema=args.required_schema,
         min_approvals=args.min_approvals,
         min_total_votes=args.min_total_votes,
@@ -86,6 +88,7 @@ def main(argv: list[str] | None = None) -> int:
     submit.add_argument("--status", choices=["candidate", "generated"], default="candidate")
     submit.add_argument("--spec-id", default=SPEC_ID)
     submit.add_argument("--spec-version", default=SPEC_VERSION)
+    submit.add_argument("--spec-digest", default=SPEC_DIGEST)
 
     batch = sub.add_parser("submit-batch", help="stream an NDJSON dataset into candidate events")
     batch.add_argument("file")
@@ -94,6 +97,7 @@ def main(argv: list[str] | None = None) -> int:
     batch.add_argument("--status", choices=["candidate", "generated"], default="generated")
     batch.add_argument("--spec-id", default=SPEC_ID)
     batch.add_argument("--spec-version", default=SPEC_VERSION)
+    batch.add_argument("--spec-digest", default=SPEC_DIGEST)
 
     vote = sub.add_parser("vote", help="append or replace a voter's current vote for a candidate")
     vote.add_argument("candidate_id")
@@ -105,6 +109,7 @@ def main(argv: list[str] | None = None) -> int:
     vote.add_argument("--run-id", required=True)
     vote.add_argument("--spec-id", default=SPEC_ID)
     vote.add_argument("--spec-version", default=SPEC_VERSION)
+    vote.add_argument("--spec-digest", default=SPEC_DIGEST)
 
     query = sub.add_parser("query-log", help="record the query/tool trace visible to later review actors")
     query.add_argument("--actor", required=True)
@@ -124,6 +129,7 @@ def main(argv: list[str] | None = None) -> int:
     verify.add_argument("candidate_id")
     verify.add_argument("--spec-id", default=SPEC_ID)
     verify.add_argument("--spec-version", default=SPEC_VERSION)
+    verify.add_argument("--spec-digest", default=SPEC_DIGEST)
     verify.add_argument("--required-schema", default=DEFAULT_SCHEMA_VERSION)
     verify.add_argument("--min-approvals", type=int, default=2)
     verify.add_argument("--min-total-votes", type=int, default=2)
@@ -138,6 +144,7 @@ def main(argv: list[str] | None = None) -> int:
     packet.add_argument("candidate_id")
     packet.add_argument("--spec-id", default=SPEC_ID)
     packet.add_argument("--spec-version", default=SPEC_VERSION)
+    packet.add_argument("--spec-digest", default=SPEC_DIGEST)
     packet.add_argument("--required-schema", default=DEFAULT_SCHEMA_VERSION)
     packet.add_argument("--min-approvals", type=int, default=2)
     packet.add_argument("--min-total-votes", type=int, default=2)
@@ -151,7 +158,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "init":
         store.init()
-        _dump({"log": str(store.path), "specId": SPEC_ID, "specVersion": SPEC_VERSION})
+        _dump({"log": str(store.path), "specId": SPEC_ID, "specVersion": SPEC_VERSION, "specDigest": SPEC_DIGEST})
         return 0
     if args.command == "spec":
         _dump({
@@ -159,6 +166,7 @@ def main(argv: list[str] | None = None) -> int:
             "actors": [str(path) for path in sorted((ROOT / "spec" / "actors").glob("*.star"))],
             "specId": SPEC_ID,
             "specVersion": SPEC_VERSION,
+            "specDigest": SPEC_DIGEST,
             "rule": "StarLang source is authoritative; downstream bindings consume compiler manifests.",
         })
         return 0
@@ -174,6 +182,7 @@ def main(argv: list[str] | None = None) -> int:
             run_id=args.run_id,
             spec_id=args.spec_id,
             spec_version=args.spec_version,
+            spec_digest=args.spec_digest,
             knowledge_status=args.status,
         )
         store.append(event)
@@ -188,6 +197,7 @@ def main(argv: list[str] | None = None) -> int:
                 run_id=args.run_id,
                 spec_id=args.spec_id,
                 spec_version=args.spec_version,
+                spec_digest=args.spec_digest,
                 knowledge_status=args.status,
             ))
             count += 1
@@ -204,6 +214,7 @@ def main(argv: list[str] | None = None) -> int:
             evidence_ids=args.evidence_id,
             spec_id=args.spec_id,
             spec_version=args.spec_version,
+            spec_digest=args.spec_digest,
         )
         store.append(event)
         _dump(event)
