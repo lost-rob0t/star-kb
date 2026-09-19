@@ -241,9 +241,27 @@ class LocalLeaseLimiter:
             if not isinstance(state, dict):
                 state = {}
 
-            entries = state.get(key)
-            if not isinstance(entries, list):
+            bucket = state.get(key)
+            if isinstance(bucket, list):
+                entries = bucket
+                remembered_last_started = max(
+                    (float(item.get("started", 0)) for item in bucket if isinstance(item, dict)),
+                    default=0.0,
+                )
+            elif isinstance(bucket, dict):
+                entries = bucket.get("active", [])
+                if not isinstance(entries, list):
+                    entries = []
+                raw_last_started = bucket.get("last_started", 0.0)
+                remembered_last_started = (
+                    float(raw_last_started)
+                    if isinstance(raw_last_started, (int, float))
+                    else 0.0
+                )
+            else:
                 entries = []
+                remembered_last_started = 0.0
+
             live = []
             for entry in entries:
                 if not isinstance(entry, dict):
@@ -260,13 +278,16 @@ class LocalLeaseLimiter:
                 retry = min(max(0.1, lease_seconds - (now - float(x["started"]))) for x in live)
                 raise RateLimitError("local_rate_limited", f"{key}: concurrency", retry)
 
-            last_started = max((float(x["started"]) for x in live), default=0.0)
+            last_started = max(
+                remembered_last_started,
+                max((float(x["started"]) for x in live), default=0.0),
+            )
             gap = min_interval_seconds - (now - last_started)
             if gap > 0:
                 raise RateLimitError("local_rate_limited", f"{key}: interval", gap)
 
             live.append({"token": token, "pid": os.getpid(), "started": now})
-            state[key] = live
+            state[key] = {"active": live, "last_started": now}
             stream.seek(0)
             stream.truncate()
             json.dump(state, stream, sort_keys=True)
@@ -283,13 +304,32 @@ class LocalLeaseLimiter:
                 state = json.load(stream)
             except ValueError:
                 return
-            entries = state.get(key)
-            if not isinstance(entries, list):
+            bucket = state.get(key)
+            if isinstance(bucket, list):
+                entries = bucket
+                last_started = max(
+                    (float(item.get("started", 0)) for item in bucket if isinstance(item, dict)),
+                    default=0.0,
+                )
+            elif isinstance(bucket, dict):
+                entries = bucket.get("active", [])
+                if not isinstance(entries, list):
+                    entries = []
+                raw_last_started = bucket.get("last_started", 0.0)
+                last_started = (
+                    float(raw_last_started)
+                    if isinstance(raw_last_started, (int, float))
+                    else 0.0
+                )
+            else:
                 return
-            state[key] = [
-                item for item in entries
-                if not (isinstance(item, dict) and item.get("token") == token)
-            ]
+            state[key] = {
+                "active": [
+                    item for item in entries
+                    if not (isinstance(item, dict) and item.get("token") == token)
+                ],
+                "last_started": last_started,
+            }
             stream.seek(0)
             stream.truncate()
             json.dump(state, stream, sort_keys=True)
