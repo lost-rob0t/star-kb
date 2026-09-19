@@ -26,6 +26,18 @@ class ProjectionManifest:
     schema_revision: str = "0.9.0+fields.20260909.1"
     expansion_hash: str = "dd3a86ab5d789f746e9f12167f2c256316f0f35082ec659362a3b95f54f59cd8"
 
+    @classmethod
+    def from_mapping(cls, value: dict[str, Any]) -> "ProjectionManifest":
+        defaults = cls()
+        return cls(
+            release_version=str(value.get("release_version", defaults.release_version)),
+            schema_version=str(value.get("schema_version", defaults.schema_version)),
+            profile=str(value.get("profile", defaults.profile)),
+            profile_version=str(value.get("profile_version", defaults.profile_version)),
+            schema_revision=str(value.get("schema_revision", defaults.schema_revision)),
+            expansion_hash=str(value.get("expansion_content_hash", value.get("expansion_hash", defaults.expansion_hash))),
+        )
+
 
 @dataclass(frozen=True)
 class Fact:
@@ -37,14 +49,28 @@ class Fact:
 
 
 def prolog_atom(value: str) -> str:
-    escaped = (
-        value.replace("\\", "\\\\")
-        .replace("'", "\\'")
-        .replace("\n", "\\n")
-        .replace("\r", "\\r")
-        .replace("\t", "\\t")
-    )
-    return f"'{escaped}'"
+    escaped: list[str] = []
+    for char in value:
+        code = ord(char)
+        if char == "\\":
+            escaped.append("\\\\")
+        elif char == "'":
+            escaped.append("\\'")
+        elif char == "\n":
+            escaped.append("\\n")
+        elif char == "\r":
+            escaped.append("\\r")
+        elif char == "\t":
+            escaped.append("\\t")
+        elif char == "\b":
+            escaped.append("\\b")
+        elif char == "\f":
+            escaped.append("\\f")
+        elif code < 0x20 or code == 0x7F:
+            escaped.append(f"\\x{code:x}\\")
+        else:
+            escaped.append(char)
+    return "'" + "".join(escaped) + "'"
 
 
 def prolog_term(value: Any) -> str:
@@ -62,7 +88,9 @@ def prolog_term(value: Any) -> str:
         return repr(value)
     if isinstance(value, str):
         return prolog_atom(value)
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, list):
+        return "[" + ", ".join(prolog_term(v) for v in value) + "]"
+    if isinstance(value, tuple):
         return "[" + ", ".join(prolog_term(v) for v in value) + "]"
     raise TypeError(f"unsupported Prolog value: {type(value).__name__}")
 
@@ -109,18 +137,6 @@ def endpoint_value(value: Any) -> str | None:
     return None
 
 
-def iter_scalars(value: Any, path: str = "") -> Iterator[tuple[str, Any]]:
-    if isinstance(value, dict):
-        for key in sorted(value):
-            yield from iter_scalars(value[key], child_pointer(path, key))
-        return
-    if isinstance(value, list):
-        for index, item in enumerate(value):
-            yield from iter_scalars(item, child_pointer(path, index))
-        return
-    yield path, value
-
-
 def _walk(doc_id: str, value: Any, path: str = "") -> Iterator[Fact]:
     if isinstance(value, dict):
         yield Fact("star_json_object", (doc_id, path))
@@ -147,7 +163,11 @@ def _semantic_facts(document: dict[str, Any], manifest: ProjectionManifest) -> I
     schema_version = str(document.get("schema_version", manifest.schema_version))
     version = document.get("version", 0)
 
-    yield Fact("star_doc", (doc_id, dtype, dataset, schema_version, version, content_hash(document)))
+    declared_content_hash = document.get("content_hash")
+    if not isinstance(declared_content_hash, str):
+        declared_content_hash = ""
+    yield Fact("star_doc", (doc_id, dtype, dataset, schema_version, version, declared_content_hash))
+    yield Fact("star_projection_input_hash", (doc_id, "sha256-canonical-json", content_hash(document)))
     yield Fact(
         "star_profile",
         (
@@ -262,6 +282,18 @@ def _semantic_facts(document: dict[str, Any], manifest: ProjectionManifest) -> I
                 value = qualifiers[key]
                 if value is None or isinstance(value, (str, bool, int, float)):
                     yield Fact("star_relation_qualifier", (doc_id, key, value))
+
+
+def iter_scalars(value: Any, path: str = "") -> Iterator[tuple[str, Any]]:
+    if isinstance(value, dict):
+        for key in sorted(value):
+            yield from iter_scalars(value[key], child_pointer(path, key))
+        return
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            yield from iter_scalars(item, child_pointer(path, index))
+        return
+    yield path, value
 
 
 def project_document(document: dict[str, Any], manifest: ProjectionManifest | None = None) -> list[Fact]:
