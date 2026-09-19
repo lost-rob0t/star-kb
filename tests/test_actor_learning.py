@@ -60,6 +60,52 @@ def fixture_document() -> dict:
 
 
 class ActorLearningTests(unittest.TestCase):
+    def test_replay_index_is_disposable_and_rebuildable(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            store = EventStore(Path(td) / "events.ndjson")
+            event = candidate_event(
+                fixture_document(),
+                proposed_by="extractor-a",
+                run_id="run-1",
+            )
+            store.append(event)
+            self.assertTrue(store.index_path.exists())
+            self.assertEqual(
+                "starintel:relation:learning-test",
+                store.latest_candidate("starintel:relation:learning-test")["candidateId"],
+            )
+
+            store.index_path.unlink()
+            for suffix in ("-wal", "-shm"):
+                Path(str(store.index_path) + suffix).unlink(missing_ok=True)
+
+            rebuilt = store.latest_candidate("starintel:relation:learning-test")
+            self.assertIsNotNone(rebuilt)
+            self.assertEqual(event["eventId"], rebuilt["eventId"])
+
+    def test_append_many_indexes_stream_without_materializing_it(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            store = EventStore(Path(td) / "events.ndjson")
+
+            def events():
+                for number in range(3):
+                    document = fixture_document()
+                    document["_id"] = f"starintel:relation:batch-{number}"
+                    yield candidate_event(
+                        document,
+                        proposed_by="dataset-generator",
+                        run_id="batch-1",
+                        knowledge_status="generated",
+                    )
+
+            count = store.append_many(events(), batch_size=2)
+            self.assertEqual(3, count)
+            self.assertEqual(
+                "starintel:relation:batch-2",
+                store.latest_candidate("starintel:relation:batch-2")["candidateId"],
+            )
+            self.assertEqual(3, sum(1 for _ in store.events()))
+
     def test_event_log_replays_candidate_latest_vote_and_query_context(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             store = EventStore(Path(td) / "events.ndjson")
