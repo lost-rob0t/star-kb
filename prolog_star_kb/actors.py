@@ -374,6 +374,38 @@ def run_prolog_verification(
     return result
 
 
+def verification_event(
+    packet: dict[str, Any],
+    report: dict[str, Any],
+    *,
+    run_id: str,
+) -> dict[str, Any]:
+    policy = packet["policy"]
+    payload = {
+        "candidateId": packet["candidate"]["candidateId"],
+        "decision": report.get("decision", "error"),
+        "issues": list(report.get("issues", [])),
+        "approveWeight": int(report.get("approveWeight", 0)),
+        "rejectWeight": int(report.get("rejectWeight", 0)),
+        "abstainWeight": int(report.get("abstainWeight", 0)),
+        "totalWeight": int(report.get("totalWeight", 0)),
+        "approvalCount": int(report.get("approvalCount", 0)),
+        "voteCount": int(report.get("voteCount", 0)),
+        "specId": policy["specId"],
+        "specVersion": policy["specVersion"],
+        "requiredSchema": policy["requiredSchema"],
+        "policy": policy,
+        "verifier": "starintel-verify-v1",
+        "runId": run_id,
+    }
+    return {
+        "eventId": event_id("knowledge.verification.completed", payload),
+        "eventType": "knowledge.verification.completed",
+        "observedAt": utc_now(),
+        **payload,
+    }
+
+
 def review_context(
     store: EventStore,
     *,
