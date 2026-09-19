@@ -41,7 +41,7 @@ tools/star-kb-actors init
 tools/star-kb-actors submit candidate.json --actor extractor-a --run-id run-1
 tools/star-kb-actors vote starintel:relation:r1 --actor reviewer-a --stance approve --run-id run-2
 tools/star-kb-actors context --candidate starintel:relation:r1
-tools/star-kb-actors verify starintel:relation:r1
+tools/star-kb-actors verify starintel:relation:r1 --run-id verify-1
 #+end_src
 
 Large LLM-generated NDJSON datasets can be streamed with =submit-batch=. This stages candidates only; it does not promote them into canonical truth.
