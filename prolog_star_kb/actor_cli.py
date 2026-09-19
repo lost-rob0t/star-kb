@@ -79,6 +79,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("init", help="initialize the local append-only actor event log")
+    sub.add_parser("index-rebuild", help="rebuild the disposable SQLite replay index")
     sub.add_parser("spec", help="print canonical StarLang spec locations")
     spec_check = sub.add_parser("spec-check", help="validate canonical .star sources with StarLang")
     spec_check.add_argument("--starlang", default="starlang")
@@ -164,7 +165,17 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "init":
         store.init()
-        _dump({"log": str(store.path), "specId": SPEC_ID, "specVersion": SPEC_VERSION, "specDigest": SPEC_DIGEST})
+        _dump({
+            "log": str(store.path),
+            "index": str(store.index_path),
+            "specId": SPEC_ID,
+            "specVersion": SPEC_VERSION,
+            "specDigest": SPEC_DIGEST,
+        })
+        return 0
+    if args.command == "index-rebuild":
+        store.rebuild_index()
+        _dump({"log": str(store.path), "index": str(store.index_path), "rebuilt": True})
         return 0
     if args.command == "spec":
         _dump({
@@ -195,9 +206,8 @@ def main(argv: list[str] | None = None) -> int:
         _dump(event)
         return 0
     if args.command == "submit-batch":
-        count = 0
-        for document in iter_ndjson(args.file):
-            store.append(candidate_event(
+        events = (
+            candidate_event(
                 document,
                 proposed_by=args.actor,
                 run_id=args.run_id,
@@ -205,9 +215,11 @@ def main(argv: list[str] | None = None) -> int:
                 spec_version=args.spec_version,
                 spec_digest=args.spec_digest,
                 knowledge_status=args.status,
-            ))
-            count += 1
-        _dump({"submitted": count, "log": str(store.path)})
+            )
+            for document in iter_ndjson(args.file)
+        )
+        count = store.append_many(events)
+        _dump({"submitted": count, "log": str(store.path), "index": str(store.index_path)})
         return 0
     if args.command == "vote":
         event = vote_event(
