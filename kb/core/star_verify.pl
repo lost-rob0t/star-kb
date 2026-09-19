@@ -7,6 +7,8 @@
 
 :- use_module(library(http/json)).
 
+:- discontiguous verification_issue/2.
+
 :- multifile verification_document/12.
 :- multifile verification_policy/12.
 :- multifile verification_source/2.
@@ -31,7 +33,7 @@ non_empty_atom(Value) :-
     Length > 0.
 
 hex_code(Code) :-
-    code_type(Code, xdigit).
+    code_type(Code, xdigit(_)).
 
 valid_sha256(Value) :-
     atom(Value),
