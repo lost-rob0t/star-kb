@@ -1,6 +1,7 @@
 :- module(star_json,
           [ star_projection_manifest/6,
             star_doc/6,
+            star_projection_input_hash/3,
             star_profile/5,
             star_json_object/2,
             star_json_array/3,
@@ -22,6 +23,7 @@
 
 :- dynamic star_projection_manifest/6.
 :- dynamic star_doc/6.
+:- dynamic star_projection_input_hash/3.
 :- dynamic star_profile/5.
 :- dynamic star_json_object/2.
 :- dynamic star_json_array/3.
