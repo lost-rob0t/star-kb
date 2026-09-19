@@ -12,8 +12,8 @@
 * Implemented
 - StarLang learning protocol source under =spec/=.
 - Six actor contracts for ingest, review, voting, formal verification, audit, and optimization.
-- Append-only local event store.
-- Single and streaming NDJSON candidate staging.
+- Append-only local event store with a disposable/rebuildable SQLite replay index.
+- Single and streaming NDJSON candidate staging with batched index updates.
 - Latest-vote replay semantics while preserving vote history.
 - Query observation logging, bounded review-context export, and deterministic learning audits.
 - Formal SWI-Prolog admission verifier.
@@ -36,3 +36,16 @@
 - =python3 scripts/validate-docs.py=
 - =python3 -m unittest discover -s tests -p 'test_*.py' -v=
 - StarLang compiler validation of the =.star= sources.
+
+* Approval Table
+| Approval area | Required authority | State | Evidence required | Evidence reference |
+|---------------+--------------------+-------+-------------------+--------------------|
+| Research | Project owner | APPROVED | Approved learning-loop research | ../../research/star-kb/actor-learning-loop-research.org |
+| Design | Project owner | APPROVED | Approved actor learning-loop design | ../../design/star-kb/actor-learning-loop-design.org |
+| Execution | Project owner | APPROVED | Explicit implementation request | 2026-09-18 conversation direction |
+| Verification | Repository maintainer | PENDING | Green PR CI, SWI-Prolog tests, StarLang source checks | PR #8 |
+
+* Changelog
+- 2026-09-18 :: Implemented actor learning-loop CLI, event replay, voting, query context, and Prolog admission.
+- 2026-09-18 :: Added exact StarLang source-digest adherence and persisted verification certificates.
+- 2026-09-18 :: Added deterministic learning audit and rebuildable SQLite replay index for large generated datasets.
