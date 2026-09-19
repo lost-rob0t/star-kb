@@ -29,3 +29,14 @@
 - [ ] SWI-Prolog smoke test green in CI.
 - [ ] RAGE/docs synchronization green.
 - [ ] Review PR diff after CI.
+
+* Approval Table
+| Approval area | Required authority | State | Evidence reference |
+|---------------+--------------------+-------+--------------------|
+| Research | Project owner | APPROVED | Existing Star KB research |
+| Design | Project owner | APPROVED | long-term-evidence-linkage.org |
+| Execution | Project owner | APPROVED | 2026-09-18 implementation request |
+| Verification | Repository maintainer | PENDING | PR #5 CI |
+
+* Changelog
+- 2026-09-18 :: Began long-term evidence-maturity implementation on =feature/long-term-linkage-kb=.
