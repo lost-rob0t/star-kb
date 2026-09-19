@@ -89,7 +89,42 @@ jobs:
         env:
           STARLANG_REF: github:lost-rob0t/star-lang/c9d56a38e04ef5cc1cfe90924da1551c7125bf3e
         run: |
-          nix run "$STARLANG_REF" -- load "$PWD/spec/star-kb-learning.star"
+          set -euo pipefail
+
+          # The final compiler owns actor-unit validation today.
           for actor in spec/actors/*.star; do
             nix run "$STARLANG_REF" -- check "$PWD/$actor"
           done
+
+          # Pin the exact library source bytes used by Star KB runtime events.
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+          from prolog_star_kb.actors import SPEC_DIGEST, SPEC_PATH
+
+          actual = "sha256:" + hashlib.sha256(Path(SPEC_PATH).read_bytes()).hexdigest()
+          if SPEC_DIGEST != actual:
+              raise SystemExit(f"StarLang spec digest drift: runtime={SPEC_DIGEST} source={actual}")
+          print(f"ok: canonical StarLang library source {SPEC_DIGEST}")
+          PY
+
+          # Full spec-library compilation is still prototype-owned in this
+          # pinned StarLang revision. Try it, fail on real StarLang errors,
+          # but tolerate only the known transitional sha256sum bug (#144).
+          set +e
+          library_output="$(
+            nix run "$STARLANG_REF" -- load "$PWD/spec/star-kb-learning.star" 2>&1
+          )"
+          library_status=$?
+          set -e
+
+          if [ "$library_status" -eq 0 ]; then
+            printf '%s\n' "$library_output"
+            echo "ok: full StarLang spec-library load"
+          elif printf '%s\n' "$library_output" | grep -Fq             "SHA-256 calculation failed through sha256sum"; then
+            printf '%s\n' "$library_output"
+            echo "::warning::Full spec-library load is blocked by lost-rob0t/star-lang#144; final spec-library manifests/codegen are tracked by #143."
+          else
+            printf '%s\n' "$library_output" >&2
+            exit "$library_status"
+          fi
