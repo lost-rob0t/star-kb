@@ -1,0 +1,117 @@
+#+title: Research — self-improving symbolic long-term memory actor loop
+#+description: External research grounding for Star KB graph memory, provenance, voting, query traces, and controlled self-improvement.
+#+status: approved
+#+filetags: :star-kb:research:memory:knowledge-graph:provenance:voting:
+:PROPERTIES:
+:ID: star-kb-actor-learning-loop-research
+:END:
+
+* Question
+How should Star KB turn research text and large LLM-generated datasets into durable symbolic knowledge that can be queried, reviewed, audited, and improved over time without treating model output as truth?
+
+* Findings
+
+** Graph-structured long-term memory is the right durable abstraction
+Recent agent-memory work repeatedly separates raw/episodic observations from consolidated graph memory.
+
+- GAM (ACL 2026) explicitly decouples memory encoding from consolidation so transient observations do not directly overwrite stable long-term knowledge.
+  - https://aclanthology.org/2026.acl-long.1600/
+- Associa (ACL Findings 2025) uses an event-centric memory graph and evidence-rich subgraph retrieval for long-term assistant memory.
+  - https://aclanthology.org/2025.findings-acl.901/
+- The episodic Knowledge Graph architecture in Dialogue & Discourse 2025 combines an event bus with an explainable, controllable symbolic long-term memory.
+  - https://aclanthology.org/2025.dnd-16.10/
+- KG-Agent (ACL 2025) combines an LLM, multifunctional tools, a KG executor, and knowledge memory in an iterative reasoning loop.
+  - https://aclanthology.org/2025.acl-long.468/
+
+Implication: Star KB should preserve raw observations/events separately, then promote only verified knowledge into stable canonical StarIntel JSON/Prolog projections.
+
+** Hierarchical graph summaries help global questions, but are not truth
+Microsoft GraphRAG builds a hierarchical knowledge graph and community summaries to answer global questions over large corpora.
+- https://www.microsoft.com/en-us/research/blog/graphrag-improving-global-search-via-dynamic-community-selection/
+
+Implication: summaries/community abstractions are useful derived context and indexing artifacts, not canonical claims. Star KB should be able to regenerate them from verified records.
+
+** Provenance must be first-class and composable
+W3C PROV models provenance through Entity, Activity, and Agent plus generation, derivation, usage, and attribution links.
+- https://www.w3.org/TR/prov-o/
+- https://www.w3.org/TR/prov-overview/
+
+Implication: StarIntel provenance should be rich enough to answer who/what generated a candidate, what inputs it used, what transform/model/tool ran, and what later verification activity admitted or rejected it.
+
+** Plain majority voting is too weak
+Snorkel's weak-supervision work highlights failure modes of majority vote: voters can differ in accuracy, be correlated, and have uneven coverage. Their label-model framing explicitly treats votes/abstentions as noisy supervision rather than ground truth.
+- https://snorkel.ai/blog/how-does-the-snorkel-flow-label-model-work/
+- https://snorkel.ai/blog/weak-supervision-modeling/
+
+Implication:
+1. Initial Star KB voting may use explicit integer weights and quorum rules.
+2. Do not interpret multiple LLMs from the same family/prompt/data as independent evidence.
+3. A later voter-reliability model should learn from independent adjudication/ground truth, not recursively from verdicts that were themselves produced by the same votes.
+4. Correlated voters should be down-weighted or grouped into a shared evidence family.
+
+** Query traces are useful improvement data but may be sensitive
+OpenTelemetry's current GenAI semantic conventions explicitly model retrieval queries, tool-call arguments/results, model identity, and related telemetry, while warning that prompts, retrieval query text, and tool arguments/results can contain sensitive data.
+- https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/
+- https://opentelemetry.io/docs/specs/semconv/general/events/
+
+Implication: Star KB query observations are valuable inputs to audit/optimizer actors, but remain local/replay evidence by default, are excluded from Git, and should later gain retention/redaction policy.
+
+* Resulting architecture
+#+begin_src text
+raw text / files / web / generated NDJSON
+       |
+       v
+observation events --------------------------+
+       |                                     |
+       v                                     |
+LLM / deterministic extraction               |
+       |                                     |
+       v                                     |
+candidate StarIntel JSON                      |
+       |                                     |
+       +--> independent reviewers/voters      |
+       |         |                            |
+       |         v                            |
+       |      vote events                     |
+       |                                     |
+       +--> Prolog exact-spec verifier         |
+                 |                            |
+          verification certificate            |
+                 |                            |
+          explicit promotion gate             |
+                 |                            |
+                 v                            |
+       canonical StarIntel JSON                |
+                 |                            |
+                 v                            |
+        deterministic Prolog projection        |
+                 |                            |
+query tools --> query observation events ------+
+                 |
+                 v
+      reviewer / auditor / optimizer
+                 |
+                 v
+    improvement proposals / new candidates
+                 |
+                 +------> same verification loop
+#+end_src
+
+* Design decisions
+- Event log is append-only and replayable.
+- Canonical knowledge remains canonical StarIntel JSON.
+- Prolog projections remain rebuildable derivatives.
+- Model output is candidate/generated knowledge.
+- Verification decisions are persisted as events/certificates.
+- Exact StarLang spec/version identity is part of every candidate/vote verification packet.
+- StarLang source is canonical for the actor protocol; language bindings consume compiled manifests.
+- No unrestricted Prolog evaluation is exposed.
+- No automatic self-modification bypasses tests/review/spec verification.
+
+* Follow-up research
+- Reliability/correlation-aware voter aggregation from independent adjudicated samples.
+- Query-log retention/redaction and OpenTelemetry-compatible export.
+- Graph-memory consolidation policies: event -> episode -> stable claim.
+- Contradiction aging and temporal truth maintenance.
+- Incremental/sharded verification for multi-million-document generated datasets.
+- Evaluation suite measuring retrieval quality, contradiction rate, provenance completeness, and verifier false acceptance/rejection.
