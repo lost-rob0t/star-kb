@@ -19,7 +19,7 @@ from prolog_star_kb.llm_harness import (
     StarIntelLLMHarness,
     provider_text,
 )
-from prolog_star_kb.llm_rate import _window_decision
+from prolog_star_kb.llm_rate import LocalLeaseLimiter, RateLimitError, _window_decision
 
 
 class QuotaHandler(BaseHTTPRequestHandler):
@@ -161,6 +161,27 @@ class RateTests(unittest.TestCase):
         )
         self.assertFalse(decision.allowed)
         self.assertEqual(decision.reason, "reserve_floor")
+
+    def test_minimum_launch_interval_survives_release(self):
+        with tempfile.TemporaryDirectory() as directory:
+            limiter = LocalLeaseLimiter(Path(directory) / "rate.json")
+            token = limiter.acquire(
+                "gpt",
+                max_concurrency=2,
+                min_interval_seconds=10,
+                lease_seconds=30,
+            )
+            limiter.release("gpt", token)
+            with self.assertRaises(RateLimitError) as error:
+                limiter.acquire(
+                    "gpt",
+                    max_concurrency=2,
+                    min_interval_seconds=10,
+                    lease_seconds=30,
+                )
+        self.assertEqual(error.exception.code, "local_rate_limited")
+        self.assertIn("interval", error.exception.detail)
+        self.assertGreater(error.exception.retry_after, 0)
 
 
 class ParserTests(unittest.TestCase):
