@@ -163,7 +163,7 @@ an explicit StarIntel data action.
 | Research | Project owner | APPROVED | Existing Star KB research direction |
 | Design | Project owner | APPROVED | 2026-09-18 request for long-term Prolog KB and linkage levels |
 | Execution | Project owner | APPROVED | 2026-09-18 request to implement in =star-kb= |
-| Bulk ingestion | Project owner | BLOCKED | Separate gate required |
+| Bulk ingestion | Project owner | NOT STARTED | Separate gate required |
 | Verification | Repository maintainer | PENDING | feature branch CI/PR |
 
 * Changelog
