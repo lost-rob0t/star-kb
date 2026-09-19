@@ -15,6 +15,8 @@ from .projection import prolog_atom, prolog_term
 
 SPEC_ID = "org.starintel/kb-learning@1"
 SPEC_VERSION = "0.1.0"
+SPEC_PATH = Path(__file__).resolve().parents[1] / "spec" / "star-kb-learning.star"
+SPEC_DIGEST = hashlib.sha256(SPEC_PATH.read_bytes()).hexdigest()
 DEFAULT_SCHEMA_VERSION = "0.9.0"
 
 
@@ -92,6 +94,7 @@ def candidate_event(
     run_id: str,
     spec_id: str = SPEC_ID,
     spec_version: str = SPEC_VERSION,
+    spec_digest: str = SPEC_DIGEST,
     knowledge_status: str = "candidate",
 ) -> dict[str, Any]:
     validate_candidate_document(document)
@@ -101,6 +104,7 @@ def candidate_event(
         "proposedBy": proposed_by,
         "specId": spec_id,
         "specVersion": spec_version,
+        "specDigest": spec_digest,
         "knowledgeStatus": knowledge_status,
         "runId": run_id,
     }
@@ -123,6 +127,7 @@ def vote_event(
     evidence_ids: Iterable[str] = (),
     spec_id: str = SPEC_ID,
     spec_version: str = SPEC_VERSION,
+    spec_digest: str = SPEC_DIGEST,
 ) -> dict[str, Any]:
     if stance not in {"approve", "reject", "abstain"}:
         raise ValueError("stance must be approve, reject, or abstain")
@@ -135,6 +140,7 @@ def vote_event(
         "weight": weight,
         "specId": spec_id,
         "specVersion": spec_version,
+        "specDigest": spec_digest,
         "reasons": list(reasons),
         "evidenceIds": list(evidence_ids),
         "runId": run_id,
@@ -203,6 +209,7 @@ def latest_votes(store: EventStore, candidate_id: str) -> list[dict[str, Any]]:
 class VerificationPolicy:
     spec_id: str = SPEC_ID
     spec_version: str = SPEC_VERSION
+    spec_digest: str = SPEC_DIGEST
     required_schema: str = DEFAULT_SCHEMA_VERSION
     min_approvals: int = 2
     min_total_votes: int = 2
@@ -233,6 +240,7 @@ def verification_packet(
         "policy": {
             "specId": policy.spec_id,
             "specVersion": policy.spec_version,
+            "specDigest": policy.spec_digest,
             "requiredSchema": policy.required_schema,
             "minApprovals": policy.min_approvals,
             "minTotalVotes": policy.min_total_votes,
@@ -259,11 +267,11 @@ def compile_verification_facts(packet: dict[str, Any]) -> str:
     policy = packet["policy"]
     ratio = policy["approvalRatio"]
     lines = [
-        ":- multifile star_verify:verification_document/11.",
-        ":- multifile star_verify:verification_policy/11.",
+        ":- multifile star_verify:verification_document/12.",
+        ":- multifile star_verify:verification_policy/12.",
         ":- multifile star_verify:verification_source/2.",
         ":- multifile star_verify:verification_evidence/4.",
-        ":- multifile star_verify:verification_vote/6.",
+        ":- multifile star_verify:verification_vote/7.",
         (
             "star_verify:verification_document("
             + ", ".join(
@@ -278,6 +286,7 @@ def compile_verification_facts(packet: dict[str, Any]) -> str:
                     _atom(provenance.get("method", "")),
                     _atom(candidate.get("specId", "")),
                     _atom(candidate.get("specVersion", "")),
+                    _atom(candidate.get("specDigest", "")),
                     _atom(candidate.get("knowledgeStatus", "")),
                 ]
             )
@@ -290,6 +299,7 @@ def compile_verification_facts(packet: dict[str, Any]) -> str:
                     _atom(candidate["candidateId"]),
                     _atom(policy["specId"]),
                     _atom(policy["specVersion"]),
+                    _atom(policy["specDigest"]),
                     _atom(policy["requiredSchema"]),
                     prolog_term(int(policy["minApprovals"])),
                     prolog_term(int(policy["minTotalVotes"])),
@@ -334,6 +344,7 @@ def compile_verification_facts(packet: dict[str, Any]) -> str:
                     prolog_term(vote.get("weight", 0)),
                     _atom(vote.get("specId", "")),
                     _atom(vote.get("specVersion", "")),
+                    _atom(vote.get("specDigest", "")),
                 ]
             )
             + ")."
@@ -393,6 +404,7 @@ def verification_event(
         "voteCount": int(report.get("voteCount", 0)),
         "specId": policy["specId"],
         "specVersion": policy["specVersion"],
+        "specDigest": policy["specDigest"],
         "requiredSchema": policy["requiredSchema"],
         "policy": policy,
         "verifier": "starintel-verify-v1",
