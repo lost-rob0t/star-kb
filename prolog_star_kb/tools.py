@@ -36,6 +36,9 @@ TOOLS: tuple[Tool, ...] = (
     Tool("kb_values", "Read arbitrary canonical JSON scalar paths from the lossless projection, including additive fields unknown to semantic indexes.", _object({"id": {"type": "string"}, "path_prefix": {"type": "string"}}, ["id", "path_prefix"]), "tool_values"),
     Tool("kb_referrers", "Find documents and JSON paths that reference a StarIntel ID.", _object({"target": {"type": "string"}}, ["target"]), "tool_referrers"),
     Tool("kb_packet", "Build a compact reasoning packet for an entity: document identity, neighbors, timeline, sources/provenance, and contradictions.", _object({"id": {"type": "string"}, "max_items": {"type": "integer", "minimum": 1, "maximum": 100}}, ["id"]), "tool_packet"),
+    Tool("kb_relation_maturity", "Explain the evidence maturity of an explicit canonical relation without inferring missing identity links.", _object({"subject": {"type": "string"}, "predicate": {"type": "string"}, "object": {"type": "string"}}, ["subject", "predicate", "object"]), "tool_relation_maturity"),
+    Tool("kb_linkage_neighbors", "List direct explicit relations/references around an entity, filtered by evidence-maturity level.", _object({"id": {"type": "string"}, "min_level": {"type": "integer", "minimum": 1, "maximum": 5}, "max_items": {"type": "integer", "minimum": 1, "maximum": 100}}, ["id"]), "tool_linkage_neighbors"),
+    Tool("kb_fact_history", "Return a bounded temporal history for an entity and relation documents that explicitly reference it.", _object({"id": {"type": "string"}, "max_items": {"type": "integer", "minimum": 1, "maximum": 100}}, ["id"]), "tool_fact_history"),
     Tool("kb_route_reasoning", "Choose a StarIntel reasoning capability route without exposing engine-specific syntax.", _object({"task": {"type": "string"}, "needs_uncertainty": {"type": "boolean"}, "needs_recursion": {"type": "boolean"}, "needs_explanation": {"type": "boolean"}, "bulk_graph": {"type": "boolean"}}, ["task"]), "tool_route_reasoning"),
 )
 
@@ -91,6 +94,27 @@ def compile_tool_call(name: str, arguments: dict[str, Any]) -> str:
             f"star_reasoning:{tool.predicate}({prolog_term(arguments['subject'])}, "
             f"{prolog_term(arguments['predicate'])}, {prolog_term(arguments['object'])}, Result)"
         )
+    if name == "kb_relation_maturity":
+        return (
+            f"star_reasoning:{tool.predicate}({prolog_term(arguments['subject'])}, "
+            f"{prolog_term(arguments['predicate'])}, {prolog_term(arguments['object'])}, Result)"
+        )
+    if name == "kb_linkage_neighbors":
+        min_level = int(arguments.get("min_level", 1))
+        max_items = int(arguments.get("max_items", 25))
+        if not 1 <= min_level <= 5:
+            raise ValueError("min_level must be between 1 and 5")
+        if not 1 <= max_items <= 100:
+            raise ValueError("max_items must be between 1 and 100")
+        return (
+            f"star_reasoning:{tool.predicate}({prolog_term(arguments['id'])}, "
+            f"{min_level}, {max_items}, Result)"
+        )
+    if name == "kb_fact_history":
+        max_items = int(arguments.get("max_items", 25))
+        if not 1 <= max_items <= 100:
+            raise ValueError("max_items must be between 1 and 100")
+        return f"star_reasoning:{tool.predicate}({prolog_term(arguments['id'])}, {max_items}, Result)"
     if name == "kb_route_reasoning":
         flags = [
             arguments.get("needs_uncertainty", False),
