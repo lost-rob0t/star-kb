@@ -56,6 +56,30 @@ OpenTelemetry's current GenAI semantic conventions explicitly model retrieval qu
 
 Implication: Star KB query observations are valuable inputs to audit/optimizer actors, but remain local/replay evidence by default, are excluded from Git, and should later gain retention/redaction policy.
 
+* Verified Facts
+- Graph-oriented long-term memory systems commonly separate transient observations from consolidated memory rather than letting every observation overwrite stable knowledge.
+- W3C PROV provides a standardized provenance model centered on entities, activities, agents, derivation, use, generation, and attribution.
+- Weak-supervision literature shows that majority vote is not sufficient when voters have unequal reliability or correlated errors.
+- Query/tool telemetry can support evaluation and improvement, but raw query text and tool arguments/results may contain sensitive data and need retention/redaction controls.
+- StarLang's own compiler/loader contract represents exact source digests as =sha256:<64 hex>= and pins specification imports to exact version plus digest.
+
+* Inference
+Star KB should treat raw observations, model extractions, votes, query traces, audits, and optimizer proposals as replayable evidence. Stable symbolic knowledge should be admitted only after exact-spec, provenance, evidence, and voting invariants pass the formal Prolog gate. Query history should improve indexes/rules/tests through new proposals rather than mutating canonical knowledge directly.
+
+* Contradictions
+- Rich self-improvement needs access to query history, while privacy and bounded-context requirements argue against indiscriminate full-log exposure. The current resolution is a deterministic metadata audit plus separately bounded review context.
+- Large model-generated datasets favor streaming ingestion, while per-candidate replay from raw NDJSON would make verification O(N) per lookup. The current resolution is authoritative append-only NDJSON plus a disposable SQLite replay index.
+- Independent voting improves confidence, but actor-name votes are not cryptographic identity or statistical independence. This remains a hardening gap rather than being treated as solved.
+
+* Unresolved Questions
+- Cryptographic actor identity/signatures for votes and verification certificates.
+- Correlation-aware voter-family policy and learned reliability calibrated only against independent adjudication.
+- Query-log retention, redaction, access-control, and OpenTelemetry export policy.
+- Incremental graph-memory consolidation and temporal truth-maintenance rules.
+- Sharded/distributed replay indexes for datasets beyond one local node.
+- Promotion transaction semantics from verified candidate event to canonical StarIntel JSON.
+- Final StarLang spec-library portable-manifest and generated downstream binding path (tracked in =lost-rob0t/star-lang#143=).
+
 * Resulting architecture
 #+begin_src text
 raw text / files / web / generated NDJSON
@@ -115,3 +139,16 @@ query tools --> query observation events ------+
 - Contradiction aging and temporal truth maintenance.
 - Incremental/sharded verification for multi-million-document generated datasets.
 - Evaluation suite measuring retrieval quality, contradiction rate, provenance completeness, and verifier false acceptance/rejection.
+
+* Approval Table
+| Approval area | Required authority | State | Evidence required | Evidence reference |
+|---------------+--------------------+-------+-------------------+--------------------|
+| Research | Project owner | APPROVED | Research direction and sources reviewed | 2026-09-18 actor learning-loop request |
+| Design | Project owner | APPROVED | Closed-loop architecture reviewed | ../../design/star-kb/actor-learning-loop-design.org |
+| Execution | Project owner | APPROVED | Explicit request to implement Star KB actor CLI | 2026-09-18 conversation direction |
+| Verification | Repository maintainer | PENDING | CI, Prolog tests, StarLang validation | PR #8 |
+
+* Changelog
+- 2026-09-18 :: Added external graph-memory, provenance, weak-supervision, and query-telemetry research.
+- 2026-09-18 :: Recorded verified facts, inference, contradictions, unresolved questions, and approval state.
+- 2026-09-18 :: Added large-dataset replay-index and exact StarLang digest conclusions.
