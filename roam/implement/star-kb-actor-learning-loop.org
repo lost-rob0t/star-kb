@@ -15,9 +15,9 @@
 - Append-only local event store.
 - Single and streaming NDJSON candidate staging.
 - Latest-vote replay semantics while preserving vote history.
-- Query observation logging and bounded review-context export.
+- Query observation logging, bounded review-context export, and deterministic learning audits.
 - Formal SWI-Prolog admission verifier.
-- Exact spec/version and schema adherence checks.
+- Exact StarLang spec ID/version/source-digest and StarIntel schema adherence checks.
 - Source/evidence integrity and voting quorum checks.
 - CLI entry point =tools/star-kb-actors=.
 - Unit and SWI-Prolog integration tests.
