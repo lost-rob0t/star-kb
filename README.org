@@ -41,12 +41,13 @@ tools/star-kb-actors init
 tools/star-kb-actors submit candidate.json --actor extractor-a --run-id run-1
 tools/star-kb-actors vote starintel:relation:r1 --actor reviewer-a --stance approve --run-id run-2
 tools/star-kb-actors context --candidate starintel:relation:r1
+tools/star-kb-actors audit --run-id audit-1
 tools/star-kb-actors verify starintel:relation:r1 --run-id verify-1
 #+end_src
 
 Large LLM-generated NDJSON datasets can be streamed with =submit-batch=. This stages candidates only; it does not promote them into canonical truth.
 
-The canonical actor/message protocol is written in StarLang under =spec/=. Downstream libraries consume StarLang compiler manifests rather than maintaining parallel schemas. Formal admission rules live in =kb/core/star_verify.pl=.
+The canonical actor/message protocol is written in StarLang under =spec/=. Candidate, vote, and verification records pin the exact SHA-256 of the StarLang learning spec in addition to its ID/version. Downstream libraries consume StarLang compiler manifests rather than maintaining parallel schemas. Formal admission rules live in =kb/core/star_verify.pl=.
 
 See =docs/star-kb-learning-loop.md=.
 
