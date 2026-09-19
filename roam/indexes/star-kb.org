@@ -10,9 +10,9 @@
 Star KB is the shared symbolic reasoning layer used by StarIntel actors and services. Canonical StarIntel JSON remains authoritative; Star KB deterministically projects that corpus into modular Prolog facts and safe reasoning tools.
 
 * Current phase
-Research and the Prolog projection/query design are approved. The active bounded implementation is =prolog-star-kb=: canonical JSON -> lossless Prolog facts + semantic indexes + AI reasoning tools.
+Research, the Prolog projection/query design, and the long-term evidence-maturity design are approved. The active bounded implementation is canonical JSON -> lossless Prolog facts + semantic indexes + bounded AI reasoning tools + explicit-link maturity/contradiction/history reasoning.
 
-No bulk real-world ingestion is authorized in this slice.
+No bulk real-world ingestion is authorized in these slices.
 
 * Active research
 - [[file:../research/star-kb/dialect-and-kb-research.org][Dialect and KB architecture research]]
@@ -60,5 +60,4 @@ No bulk real-world ingestion is authorized in this slice.
 - 2026-09-10 :: Created initial Star KB project index and design gate.
 - 2026-09-18 :: Recorded explicit approval and active =prolog-star-kb= implementation slice.
 - 2026-09-18 :: Clarified canonical JSON -> deterministic Prolog projection architecture.
-
 - 2026-09-18 :: Approved long-term evidence/linkage maturity extension and bounded agent tools.
