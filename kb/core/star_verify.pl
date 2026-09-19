@@ -37,8 +37,10 @@ hex_code(Code) :-
 
 valid_sha256(Value) :-
     atom(Value),
-    atom_length(Value, 64),
-    atom_codes(Value, Codes),
+    atom_length(Value, 71),
+    sub_atom(Value, 0, 7, 64, 'sha256:'),
+    sub_atom(Value, 7, 64, 0, Hex),
+    atom_codes(Hex, Codes),
     maplist(hex_code, Codes).
 
 verification_issue(Id, missing_document) :-
