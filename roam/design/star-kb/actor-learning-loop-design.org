@@ -1,0 +1,126 @@
+#+title: Star KB actor learning loop and formal admission
+#+description: Approved design for research-to-candidate knowledge, actor voting, query-log review, StarLang contracts, and Prolog admission verification.
+#+status: approved
+#+filetags: :star-kb:design:actors:learning:verification:starlang:
+:PROPERTIES:
+:ID: star-kb-actor-learning-loop-design
+:END:
+
+* Design status
+Approved by the project owner on 2026-09-18 through the explicit request to build the StarIntel actor-system CLI in =star-kb= and the follow-up requirements for voting, exact spec adherence, formal Prolog verification, and StarLang-owned source specifications.
+
+* Goal
+Create a replayable closed learning loop:
+
+#+begin_src text
+research text / generated dataset
+        -> extractor actors
+        -> candidate StarIntel JSON
+        -> reviewer/auditor/voter actors
+        -> formal Prolog verification
+        -> separate promotion boundary
+
+normal KB query traffic
+        -> query observation log
+        -> bounded review context
+        -> audits / improvement proposals
+        -> candidate changes
+        -> verification
+#+end_src
+
+LLMs may generate very large candidate datasets, but model output remains candidate/generated knowledge until admission succeeds.
+
+* Authority boundaries
+- Canonical StarIntel JSON remains authoritative durable knowledge.
+- The append-only learning/query event log is runtime evidence and replay state, not canonical domain truth.
+- StarLang =.star= files are the protocol source of truth for actor/message contracts.
+- Downstream language bindings consume StarLang compiler manifests and must not independently redefine the protocol.
+- Prolog owns the formal admission predicate.
+- Voting informs admission policy but never overrides failed formal invariants.
+- Promotion into canonical StarIntel JSON is intentionally separate from staging and verification.
+
+* Actor roles
+- =research-ingest=: text/bulk input -> candidate knowledge.
+- =knowledge-reviewer=: inspect candidate/context -> vote and findings.
+- =knowledge-voter=: independent candidate vote.
+- =knowledge-auditor=: inspect query history and candidate evidence -> findings/votes.
+- =knowledge-verifier=: execute the formal Prolog admission contract.
+- =knowledge-optimizer=: turn query/audit evidence into bounded improvement proposals.
+
+* Exact specification adherence
+Every candidate and vote names an exact =specId=, =specVersion=, and SHA-256 =specDigest= of the canonical StarLang source. The verifier rejects:
+- candidate/spec ID, version, or source-digest mismatch;
+- vote/spec ID, version, or source-digest mismatch;
+- wrong StarIntel schema version;
+- wrong verifier contract identity;
+- missing canonical identity/provenance requirements.
+
+A downstream library therefore cannot silently drift from the StarLang source contract.
+
+* Voting model
+The event log is immutable. Replay chooses the latest vote per voter for the active tally while preserving historical votes for audit.
+
+Default admission policy:
+- at least two approving voters;
+- at least two total voters;
+- weighted approval ratio >= 2/3;
+- integer weights 1..10000;
+- self-vote by the generating actor denied;
+- exact spec identity required on every vote.
+
+Policy values are caller/runtime configuration, but Prolog evaluates the decision.
+
+* Formal verification
+=kb/core/star_verify.pl= consumes normalized verification facts and produces an auditable decision report.
+
+Checks include:
+- candidate identity and schema;
+- document provenance actor/run/method;
+- candidate/generated status;
+- exact StarLang spec identity/version;
+- exact verifier identity;
+- source/evidence quorum and evidence->source integrity;
+- duplicate source/evidence identifiers;
+- vote validity/spec adherence;
+- self-vote exclusion;
+- voter quorum and weighted approval ratio.
+
+No arbitrary caller-supplied Prolog goal is accepted.
+
+* Query-log learning
+The CLI can record query text, bounded tool arguments, result IDs, result hash, actor, run ID, and timestamp.
+
+The deterministic =audit= pass first summarizes verifier failures, vote disagreement,
+unverified/rejected candidates, empty-result query rate, tool usage, and spec drift
+without duplicating raw query text. Reviewer/auditor/optimizer actors consume that
+summary plus bounded =review-context= packets built from replay. They may propose schema/index/rule/test/dataset improvements, but those proposals remain candidates until their own applicable gates pass.
+
+* Bulk generated datasets
+=submit-batch= streams NDJSON candidate documents into the event log without materializing the entire dataset in memory.
+
+This gate authorizes bulk *candidate staging*. It does not authorize bulk canonical promotion or uncontrolled real-world corpus ingestion.
+
+* StarLang ownership
+Canonical source:
+- =spec/star-kb-learning.star=
+- =spec/actors/*.star=
+
+Star KB delegates validation to the StarLang compiler. Generated Python/TypeScript/Common Lisp/Nim or other bindings must consume StarLang portable manifests rather than parse =.star= themselves.
+
+* Verification requirements
+- Python unit tests cover event replay, latest-vote semantics, query context, fact compilation, and formal SWI-Prolog decisions.
+- SWI-Prolog tests reject self-voting and accept a valid independent quorum.
+- Local event state is ignored by Git.
+- RAGE/doc synchronization remains green.
+- StarLang source validation is delegated to a pinned StarLang compiler in CI or an equivalent release-pinned compiler invocation.
+
+* Approval Table
+| Approval area | Required authority | State | Evidence reference |
+|---------------+--------------------+-------+--------------------|
+| Research direction | Project owner | APPROVED | 2026-09-18 research->LLM->symbolic learning-loop request |
+| Design | Project owner | APPROVED | 2026-09-18 actor CLI + voting/spec/Prolog/StarLang requirements |
+| Execution | Project owner | APPROVED | explicit request to make the system in =star-kb= |
+| Verification | Repository maintainer | PENDING | feature branch CI and runtime evidence |
+
+* Changelog
+- 2026-09-18 :: Approved and implemented initial actor learning-loop slice.

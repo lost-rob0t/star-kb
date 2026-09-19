@@ -12,9 +12,12 @@ A green build is evidence, not approval.
 
 ## Current phase
 
-The initial shared-KB research and Prolog corpus/query design are approved. The currently authorized implementation slice is `prolog-star-kb`: deterministic canonical StarIntel JSON -> Prolog projection, provenance-aware semantic indexes, bounded AI reasoning tools, and tests.
+The initial shared-KB research, Prolog corpus/query design, and actor learning-loop design are approved. Authorized implementation slices are:
 
-Do not bulk-populate the corpus with real-world data as part of this slice.
+- `prolog-star-kb`: deterministic canonical StarIntel JSON -> Prolog projection, provenance-aware semantic indexes, bounded AI reasoning tools, and tests.
+- `star-kb-actors`: append-only candidate/query replay, voting, review context, StarLang protocol contracts, and formal Prolog admission verification.
+
+Bulk generated candidate staging is permitted. Do not bulk-promote candidates into canonical truth or bulk-populate uncontrolled real-world data without a separate gate.
 
 ## Source of truth
 
@@ -40,6 +43,9 @@ Read the active note, its direct links, the project index, relevant source, and 
 - Actors should consume shared knowledge through bounded semantic query/tool contracts rather than arbitrary Prolog goals or filesystem guessing.
 - Learned/neuro-symbolic output is candidate/generated knowledge by default, not trusted canonical truth.
 - StarLang should bind to the same projection/query contract rather than create a parallel ontology.
+- Learning-loop actor/message semantics are authored in canonical `.star` sources; downstream bindings consume StarLang compiler manifests instead of parsing or redefining the protocol.
+- Votes are evidence, not authority. Formal Prolog admission must still pass.
+- Query logs and review contexts are replay/runtime evidence, not canonical domain facts.
 
 ## AI/RLM boundary
 
@@ -47,7 +53,7 @@ AI-facing tools expose named operations such as graph traversal, explanation, co
 
 Do not expose unrestricted remote Prolog evaluation. Tool calls must compile into bounded exported predicates with validated arguments and resource limits.
 
-RLM/Skynet may choose reasoning capabilities, branch investigations, request evidence, and combine results. It may not silently turn generated hypotheses into canonical facts.
+RLM/Skynet may choose reasoning capabilities, branch investigations, request evidence, combine results, review query logs, and propose improvements. It may not silently turn generated hypotheses, votes, audits, or optimization proposals into canonical facts.
 
 ## Durable agent knowledge
 
