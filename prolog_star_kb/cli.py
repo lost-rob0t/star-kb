@@ -5,6 +5,7 @@ import json
 import sys
 from pathlib import Path
 
+from .ingest.autodig import ingest_autodig, ndjson_bytes
 from .projection import ProjectionManifest, load_documents, render_projection
 from .tools import compile_tool_call, tool_catalog
 
@@ -23,6 +24,26 @@ def main(argv: list[str] | None = None) -> int:
     goal = sub.add_parser("goal", help="compile a safe AI tool call into a bounded Prolog goal")
     goal.add_argument("name")
     goal.add_argument("arguments", help="JSON object containing tool arguments")
+
+    ingest = sub.add_parser(
+        "ingest-autodig",
+        help="convert AutoDig claim bundles into candidate StarIntel NDJSON documents",
+    )
+    ingest.add_argument("input", help="JSON/NDJSON claim bundle, Markdown report, or - for stdin")
+    ingest.add_argument("-o", "--output", help="output NDJSON file; defaults to stdout")
+    ingest.add_argument(
+        "--format",
+        choices=("auto", "json", "markdown"),
+        default="auto",
+        help="input format; auto detects Markdown by file suffix",
+    )
+    ingest.add_argument(
+        "--source",
+        action="append",
+        default=[],
+        help="source locator to attach (repeatable; used by archival Markdown ingestion)",
+    )
+    ingest.add_argument("--dataset", default="autodig-import", help="dataset for generated candidates")
 
     args = parser.parse_args(argv)
     if args.command == "project":
@@ -48,6 +69,22 @@ def main(argv: list[str] | None = None) -> int:
         if not isinstance(arguments, dict):
             raise SystemExit("arguments must be a JSON object")
         print(compile_tool_call(args.name, arguments))
+        return 0
+    if args.command == "ingest-autodig":
+        text = sys.stdin.read() if args.input == "-" else Path(args.input).read_text(encoding="utf-8")
+        report_format = None if args.format == "auto" else args.format
+        documents = ingest_autodig(
+            text,
+            name=args.input,
+            dataset=args.dataset,
+            report_format=report_format,
+            extra_sources=args.source,
+        )
+        payload = ndjson_bytes(documents)
+        if args.output:
+            Path(args.output).write_bytes(payload)
+        else:
+            sys.stdout.buffer.write(payload)
         return 0
     return 2
 

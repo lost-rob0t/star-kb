@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Harbor Branch Library",
+    "kind": "public-library",
+    "city": "Harbor City",
+    "opened": "1926-04-11"
+  },
+  {
+    "name": "Old Mill Post Office",
+    "kind": "post-office",
+    "city": "Milltown",
+    "opened": "1901-09-02"
+  }
+]

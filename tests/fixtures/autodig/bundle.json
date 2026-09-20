@@ -1,0 +1,25 @@
+{
+  "report_id": "autodig-run-2026-09-19-beta",
+  "generated_by": "autodig-worker-k2",
+  "source_locators": [
+    "https://autodig.example/runs/beta/report.org",
+    "https://autodig.example/runs/beta/notes.org"
+  ],
+  "report_sha256": "4d1c7a2e9f0b3c58d6a1e7f2b4c9d0e3a5f6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d",
+  "claims": [
+    {
+      "subject": "starintel:org:milltown",
+      "predicate": "operates",
+      "object": "starintel:facility:old-mill-post-office",
+      "confidence": 0.8,
+      "evidence": "The Milltown Register notes the post office ledger is city-held.",
+      "observed_at": "2026-09-12T09:00:00Z",
+      "qualifiers": {"jurisdiction": "local"}
+    },
+    {
+      "subject": "starintel:facility:old-mill-post-office",
+      "predicate": "opened_in",
+      "object": "1901"
+    }
+  ]
+}

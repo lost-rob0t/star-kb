@@ -1,0 +1,61 @@
+{
+  "schema": "star-kb.sources.v1",
+  "notes": "Collector source registry. Real-world network sources ship disabled by default; enabling them is an explicit operator action. Fixture sources use file:// URLs so collection stays offline, deterministic, and replayable. Collected output is never committed: CI writes raw/normalized/projection files to a temp artifact directory and uploads them as workflow artifacts.",
+  "sources": [
+    {
+      "id": "fixture-http-json",
+      "type": "http_json",
+      "url": "file://tests/fixtures/collectors/example-api.json",
+      "enabled": true,
+      "dtype": "document",
+      "dataset": "collect:fixture-http-json",
+      "timeout_seconds": 10,
+      "max_retries": 1,
+      "max_items": 50
+    },
+    {
+      "id": "fixture-rss",
+      "type": "rss_atom",
+      "url": "file://tests/fixtures/collectors/feed.xml",
+      "enabled": true,
+      "dtype": "document",
+      "dataset": "collect:fixture-rss",
+      "timeout_seconds": 10,
+      "max_retries": 1,
+      "max_items": 50
+    },
+    {
+      "id": "fixture-atom",
+      "type": "rss_atom",
+      "url": "file://tests/fixtures/collectors/feed.atom",
+      "enabled": true,
+      "dtype": "document",
+      "dataset": "collect:fixture-atom",
+      "timeout_seconds": 10,
+      "max_retries": 1,
+      "max_items": 50
+    },
+    {
+      "id": "example-remote-json",
+      "type": "http_json",
+      "url": "https://example.com/data.json",
+      "enabled": false,
+      "dtype": "document",
+      "dataset": "collect:example-remote-json",
+      "timeout_seconds": 30,
+      "max_retries": 2,
+      "max_items": 200
+    },
+    {
+      "id": "example-remote-feed",
+      "type": "rss_atom",
+      "url": "https://example.com/feed.xml",
+      "enabled": false,
+      "dtype": "document",
+      "dataset": "collect:example-remote-feed",
+      "timeout_seconds": 30,
+      "max_retries": 2,
+      "max_items": 200
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Milltown Register</title>
+  <link href="https://register.example/milltown" rel="alternate"/>
+  <updated>2026-09-12T09:00:00Z</updated>
+  <id>urn:fixture:milltown-register</id>
+  <entry>
+    <title>Milltown archives digitized</title>
+    <link href="https://register.example/milltown/archives" rel="alternate"/>
+    <id>urn:fixture:milltown-entry-001</id>
+    <updated>2026-09-12T09:00:00Z</updated>
+    <summary>The 1901 post office ledger is now searchable online.</summary>
+  </entry>
+</feed>
