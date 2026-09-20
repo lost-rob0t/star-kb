@@ -34,3 +34,29 @@ The tool catalog exposes bounded semantic operations rather than arbitrary Prolo
 ## Trust boundary
 
 Generated Prolog is a deterministic derivative of canonical JSON. It is rebuildable cache/index state, never an independent truth store. LLM/RLM output must enter StarIntel as candidate JSON with provenance before it can become part of a future projection.
+
+
+## Long-term evidence maturity
+
+star_longterm adds a durable, bounded layer for reasoning about the maturity of
+explicit canonical links without inventing missing identity relationships.
+
+The five maturity levels are:
+
+1. `referenced` — a direct canonical `star_ref/3`.
+2. `asserted` — a non-negated canonical relation exists.
+3. `sourced` — the relation carries at least one source or evidence record.
+4. `corroborated` — the relation carries at least two distinct sources and two evidence records.
+5. `verified` — the relation has verified/confirmed evidence or qualifiers plus source/evidence support.
+
+These levels describe the evidence state of a relation. They are not person,
+risk, intent, guilt, or trust scores.
+
+New bounded tools:
+
+- `kb_relation_maturity` — explain all explicit assertions for a subject/predicate/object triple.
+- `kb_linkage_neighbors` — list direct explicit relations/references filtered by maturity level.
+- `kb_fact_history` — return bounded temporal observations for an entity and relation documents that reference it.
+
+Contradicting canonical relations/evidence are surfaced as `contested(true)`;
+they are never silently collapsed into one answer.

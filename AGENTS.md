@@ -12,9 +12,9 @@ A green build is evidence, not approval.
 
 ## Current phase
 
-The initial shared-KB research and Prolog corpus/query design are approved. The currently authorized implementation slice is `prolog-star-kb`: deterministic canonical StarIntel JSON -> Prolog projection, provenance-aware semantic indexes, bounded AI reasoning tools, and tests.
+The initial shared-KB research and Prolog corpus/query design are approved. The authorized implementation now includes `prolog-star-kb` plus the long-term evidence-maturity slice: deterministic canonical StarIntel JSON -> Prolog projection, provenance-aware semantic indexes, bounded AI reasoning tools, explicit-link maturity, contradiction visibility, temporal history, and tests.
 
-Do not bulk-populate the corpus with real-world data as part of this slice.
+Do not bulk-populate the corpus with real-world data as part of these slices.
 
 ## Source of truth
 
@@ -78,4 +78,4 @@ When SWI-Prolog is available, also load `kb/core/star_json.pl` and `kb/core/star
 
 ## Current next action
 
-Finish and review the bounded `prolog-star-kb` JSON projection + reasoning-tool slice. Do not bulk-ingest data until this slice is verified and the next gate is explicitly authorized.
+Verify and review the bounded long-term evidence-maturity slice on `feature/long-term-linkage-kb`. Keep identity resolution explicit/provenance-backed, and do not bulk-ingest data until a separate gate is explicitly authorized.

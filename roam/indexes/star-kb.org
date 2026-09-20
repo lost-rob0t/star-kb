@@ -10,18 +10,23 @@
 Star KB is the shared symbolic reasoning layer used by StarIntel actors and services. Canonical StarIntel JSON remains authoritative; Star KB deterministically projects that corpus into modular Prolog facts and safe reasoning tools.
 
 * Current phase
-Research and the Prolog projection/query design are approved. The active bounded implementation is =prolog-star-kb=: canonical JSON -> lossless Prolog facts + semantic indexes + AI reasoning tools.
+Research, the Prolog projection/query design, and the long-term evidence-maturity design are approved. The active bounded implementation is canonical JSON -> lossless Prolog facts + semantic indexes + bounded AI reasoning tools + explicit-link maturity/contradiction/history reasoning.
 
-No bulk real-world ingestion is authorized in this slice.
+No bulk real-world ingestion is authorized in these slices.
 
 * Active research
 - [[file:../research/star-kb/dialect-and-kb-research.org][Dialect and KB architecture research]]
 
 * Active design
 - [[file:../design/star-kb/prolog-kb-query-server-design.org][Prolog KB/query and JSON projection design]]
+- [[file:../design/star-kb/long-term-evidence-linkage.org][Long-term evidence and linkage maturity]]
 
-* Implementation branch
+* Implementation branches
 - =feature/prolog-star-kb-projection=
+- =feature/long-term-linkage-kb=
+
+* Active implementation
+- [[file:../implement/star-kb/long-term-evidence.org][Long-term evidence maturity implementation]]
 
 * Roadmap
 1. Verify deterministic JSON -> Prolog projection and safe AI tool compiler.
@@ -31,14 +36,16 @@ No bulk real-world ingestion is authorized in this slice.
 5. Add StarLang =kb=, =reason=, and RLM bindings.
 6. Add engine adapters chosen by semantic capability.
 7. Grow domain semantic indexes without sacrificing lossless generic projection.
-8. Only then begin controlled corpus ingestion/materialization.
+8. Add bitemporal, hypothesis/falsifier, source-independence, and incremental-materialization layers.
+9. Generate actor evidence-collection plans from missing proof obligations.
+10. Only then begin controlled corpus ingestion/materialization.
 
 * Gates
 | Gate | State | Requirement |
 |------+-------+-------------|
 | Research | approved | Initial architecture research accepted |
 | Design | approved | Project owner approved JSON-projection design |
-| Implementation | active | Bounded =prolog-star-kb= slice only |
+| Implementation | active | Bounded =prolog-star-kb= + long-term evidence maturity slices |
 | Bulk ingestion | blocked | Requires separate explicit gate |
 
 * Approval Table
@@ -53,3 +60,4 @@ No bulk real-world ingestion is authorized in this slice.
 - 2026-09-10 :: Created initial Star KB project index and design gate.
 - 2026-09-18 :: Recorded explicit approval and active =prolog-star-kb= implementation slice.
 - 2026-09-18 :: Clarified canonical JSON -> deterministic Prolog projection architecture.
+- 2026-09-18 :: Approved long-term evidence/linkage maturity extension and bounded agent tools.

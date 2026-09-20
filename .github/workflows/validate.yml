@@ -71,7 +71,7 @@ jobs:
           JSON
           tools/prolog-star-kb project /tmp/star-kb-fixture.json -o /tmp/star-kb-fixture.pl
           swipl -q \
-            -g "use_module('kb/core/star_json.pl'), use_module('kb/core/star_reasoning.pl'), star_json:load_projection('/tmp/star-kb-fixture.pl'), star_reasoning:tool_explain_relation('starintel:relation:ci', Explanation), nonvar(Explanation), halt(0)" \
+            -g "use_module('kb/core/star_json.pl'), use_module('kb/core/star_longterm.pl'), use_module('kb/core/star_reasoning.pl'), star_json:load_projection('/tmp/star-kb-fixture.pl'), star_reasoning:tool_explain_relation('starintel:relation:ci', Explanation), nonvar(Explanation), star_reasoning:tool_relation_maturity('starintel:person:a', works_for, 'starintel:org:b', Maturity), Maturity = relation_maturity([_|_]), star_reasoning:tool_linkage_neighbors('starintel:person:a', 3, 10, Linkage), Linkage = linkage([_|_]), halt(0)" \
             -t "halt(1)"
       - name: Synchronize structure
         run: python3 scripts/sync.py
