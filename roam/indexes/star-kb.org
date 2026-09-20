@@ -16,6 +16,7 @@ No bulk real-world ingestion is authorized in this slice.
 
 * Active research
 - [[file:../research/star-kb/dialect-and-kb-research.org][Dialect and KB architecture research]]
+- [[file:../research/star-kb/public-starintel-rules-research.org][Public StarIntel rule KB and IQ improvements research]]
 
 * Active design
 - [[file:../design/star-kb/prolog-kb-query-server-design.org][Prolog KB/query and JSON projection design]]
@@ -53,3 +54,4 @@ No bulk real-world ingestion is authorized in this slice.
 - 2026-09-10 :: Created initial Star KB project index and design gate.
 - 2026-09-18 :: Recorded explicit approval and active =prolog-star-kb= implementation slice.
 - 2026-09-18 :: Clarified canonical JSON -> deterministic Prolog projection architecture.
+- 2026-09-19 :: Added proposed public StarIntel rule KB research (pending approval).

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Harbor City Notices</title>
+    <link>https://notice.example/harbor-city</link>
+    <description>Deterministic fixture feed for star-kb collector tests.</description>
+    <item>
+      <title>Council agenda published</title>
+      <link>https://notice.example/harbor-city/agenda-2026-09</link>
+      <guid>harbor-notice-2026-09-001</guid>
+      <pubDate>Mon, 07 Sep 2026 08:00:00 +0000</pubDate>
+      <description>The September council agenda lists two zoning items.</description>
+    </item>
+    <item>
+      <title>Branch library hours extended</title>
+      <link>https://notice.example/harbor-city/library-hours</link>
+      <guid>harbor-notice-2026-09-002</guid>
+      <pubDate>Wed, 09 Sep 2026 10:30:00 +0000</pubDate>
+      <description>The Harbor Branch Library extends weekend hours through November.</description>
+    </item>
+  </channel>
+</rss>

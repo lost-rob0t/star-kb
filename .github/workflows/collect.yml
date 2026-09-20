@@ -1,0 +1,101 @@
+name: collect
+
+# CI collector plane: registry-driven raw evidence + normalized StarIntel candidates
+# + deterministic Prolog projection. Collected data is NEVER committed to the
+# repository: everything is written under RUNNER_TEMP and uploaded as workflow
+# artifacts only. Real-world network sources ship disabled in sources/registry.json;
+# enabled fixture sources use file:// URLs so runs stay offline and deterministic.
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_id:
+        description: "Optional single registry source id to collect"
+        required: false
+        default: ""
+  schedule:
+    - cron: "23 6 * * 1"
+
+concurrency:
+  group: collect-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      ids: ${{ steps.matrix.outputs.ids }}
+      count: ${{ steps.matrix.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Resolve enabled sources from registry
+        id: matrix
+        env:
+          SELECTED: ${{ github.event.inputs.source_id }}
+        run: |
+          ids=$(python3 -c 'import json, os, sys; sys.path.insert(0, "."); from collectors import enabled_source_ids; print(json.dumps(enabled_source_ids("sources/registry.json", os.environ.get("SELECTED", "").strip())))')
+          if [ "$(echo "$ids" | jq length)" = "0" ]; then
+            echo "no enabled sources selected" >&2
+            exit 1
+          fi
+          echo "ids=$ids" >> "$GITHUB_OUTPUT"
+          echo "count=$(echo "$ids" | jq length)" >> "$GITHUB_OUTPUT"
+
+  collect:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        source_id: ${{ fromJSON(needs.prepare.outputs.ids) }}
+    env:
+      SOURCE_ID: ${{ matrix.source_id }}
+      ARTIFACT_DIR: ${{ runner.temp }}/star-kb-collect
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Collect raw envelope and normalized candidates (temp dir, never committed)
+        run: |
+          python3 -c 'import json, os, sys; sys.path.insert(0, "."); from collectors import run_source; print(json.dumps(run_source("sources/registry.json", os.environ["SOURCE_ID"], os.environ["ARTIFACT_DIR"]), sort_keys=True))'
+      - name: Validate normalized StarIntel JSON
+        run: |
+          python3 - <<'PY'
+          import os
+          import sys
+          sys.path.insert(0, ".")
+          from pathlib import Path
+          from prolog_star_kb.projection import load_documents, project_document
+          source_id = os.environ["SOURCE_ID"]
+          normalized = Path(os.environ["ARTIFACT_DIR"]) / source_id / "normalized" / f"{source_id}.ndjson"
+          documents = load_documents(normalized.read_text(encoding="utf-8"))
+          assert documents, "collector produced no normalized documents"
+          for document in documents:
+              project_document(document)
+          print(f"validated {len(documents)} normalized StarIntel documents for {source_id}")
+          PY
+      - name: Project candidates to Prolog
+        run: |
+          tools/prolog-star-kb project "$ARTIFACT_DIR/$SOURCE_ID/normalized/$SOURCE_ID.ndjson" -o "$ARTIFACT_DIR/$SOURCE_ID/projection/$SOURCE_ID.pl"
+      - name: Install SWI-Prolog
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y swi-prolog-nox
+      - name: Load projection with SWI-Prolog and resolve provenance to raw hash
+        run: |
+          PL="$ARTIFACT_DIR/$SOURCE_ID/projection/$SOURCE_ID.pl"
+          swipl -q -g "use_module('kb/core/star_json.pl'), star_json:load_projection('$PL'), (star_json:star_doc(_,_,_,_,_,_) -> true; halt(1)), (star_json:star_source(_,_,_,_,_,_,H), nonvar(H), H \== '' -> halt(0); halt(1))" -t "halt(1)"
+      - name: Upload raw, candidates, and projection as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: star-kb-collect-${{ matrix.source_id }}
+          path: ${{ runner.temp }}/star-kb-collect/
+          retention-days: 14
+          if-no-files-found: error

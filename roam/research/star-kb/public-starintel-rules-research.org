@@ -1,0 +1,78 @@
+#+title: Public StarIntel rule knowledge base research
+#+description: Reviewable research minting a generalized public StarIntel rule KB and rule-system IQ improvement proposals from the 2026-09-19 critique.
+#+status: proposed
+#+filetags: :star-kb:research:starintel:rules:
+:PROPERTIES:
+:ID: star-kb-public-starintel-rules-research
+:END:
+
+* Research status
+This note presents REVIEWABLE research: a public, generalized StarIntel rule knowledge base (=kb/public/starintel/=) and fifteen improvement proposals distilled from an adversarial critique of the current rule system. Everything here is *proposed*, not approved. The RAGE gate applies: research approval, then design approval, then implementation/merge. Nothing in this note self-approves.
+
+Primary evidence (critic agent run, 2026-09-19):
+- =/tmp/opencode/dig-queue-2026-09-19/critique/rules-critique.md= (25 findings, YAGNI + conservative lenses)
+- =/tmp/opencode/dig-queue-2026-09-19/critique/critique-facts.pl= (machine-queryable findings; =top_findings/2=, =contradiction/4=, =covering_rule/2=)
+
+Rule sources that were critiqued (read-only):
+- =/home/unseen/starintel/starintel-gpt-auto-dig/AGENTS.md=
+- =/home/unseen/.config/opencode/AGENTS.md= (StarIntel sections)
+
+* Problem
+StarIntel's rule system is conservatively sound but pays for that safety in duplication, drift, and ceremony: overlapping gate/evidence layers, per-import gate reruns on top of writer-side full-corpus validation, parallel CLI entrypoints, version literals that contradict the declared authority chain, and unenforced permission bits that create false safety. The system's "IQ" — effectiveness per token and per minute — is the target, not its safety margins.
+
+* Verified Facts
+- The critique classified 10 findings as load-bearing conservative core (control gate, scripted write path, email/social graph invariants, version authority chain, ID stability, unverified-ledger visibility, RAGE scoping, run-state requirement) and 15 as ceremony/duplication/drift; top-ranked: =top_findings(10, [f08,f04,f03,f15,f11,f07,f06,f02,f19,f09])=.
+- The transactional writer and batch importer already validate the complete corpus after writing; a per-import merge-gate rerun re-validates an unchanged corpus (critique f03).
+- Two evidence ledgers (skill =verify.py= and global =prolog-verify observe=) record the same argv/exit-status fact in two places (f04); six byte-identical CLI wrappers and three gate entrypoints exist (f07).
+- CLI banner/help self-describe a retired version line while the authority chain declares a newer release (f08, contradiction c2); the documented migrator targets the retired line (f09, c6).
+- The control-file checker enforces only =enabled= and =state= while the control file declares five permission bits (f02); prose blocks =paused= while the checker requires =running= (f14, c1).
+- A multi-subject target query silently emits an empty frontier (f15); a pinned content-addressed dependency path lives in skill law (f11).
+- Both modules and loader consult cleanly under swipl 10.0.2; 16 Python tests assert the invariants on synthetic cases (=tests/test_public_starintel_kb.py=, all passing, 2026-09-19).
+
+* Inference
+Rules gain IQ when they are (a) general with registries carrying the specifics, (b) enforced by mechanism rather than prose where enforcement is cheaper, (c) gated at boundaries instead of repeated per step, (d) derived from authority instead of hand-copied, and (e) reviewed with a queryable cost/benefit checklist that knows about deletion traps and unenforced safety claims. Encoding the rules as Prolog makes them inspectable: any agent can ask which requirement a task is missing, why a merge is blocked, or which rule is ceremonial, instead of re-reading prose law.
+
+* Improvement proposals
+Minted as queryable facts in =kb/public/starintel/iq_improvements.pl= (all =proposal_status(_, proposed)=):
+
+| ID | Proposal | Source finding |
+|----+----------+----------------|
+| p01 | Gate at pass-end + integration merge, not per import | f03 |
+| p02 | One canonical gate command + one evidence ledger | f04 |
+| p03 | Enforce or delete permission bits | f02 |
+| p04 | One CLI entrypoint per operation | f07 |
+| p05 | Derive displayed version text from the authority | f08 |
+| p06 | Retire unsanctioned one-off generators to archive | f06 |
+| p07 | Resolve dependencies dynamically; no pinned store paths | f11 |
+| p08 | Warn/error on ambiguous-query empty frontier | f15 |
+| p09 | Migration commands track the authority line | f09 |
+| p10 | Canonical-root registry instead of subject statutes | f10 |
+| p11 | Trim memory ceremony to the provenance core | f19 |
+| p12 | Document the real sanctioned writer surface | f22 |
+| p13 | Prose aligns to the fail-closed checker semantics | f14 |
+| p14 | Scope discovery policy to enforcing runtimes | f21 |
+| p15 | Enforce output-target restrictions in code | f16 |
+
+Kept as-is (rejected changes): f12 person materialization (fix representation in schema, never identity discipline), f20 RAGE stays scoped to star-kb, f24 the misspelled unverified ledger artifact is a contract, and the fail-closed gate statement is never deduplicated away from its audience documents.
+
+* Contradictions
+Inherited from the critique (c1-c8) and carried into the KB as open policy positions: prose-vs-checker state semantics (resolved p13: fail-closed wins), version text vs authority (p05), global 0.9-era prose vs 0.10 reunified line (p05/p09), mandated-but-absent skill (runtime lag; owner action), forgejo-primary vs github issue URLs (operator decision), brave-only vs runtime tools (p14), two-writers-doc vs five-paths-disk (p12). No contradiction inside the public KB itself was found while testing.
+
+* Unresolved Questions
+- Should the public KB become a versioned contract (predicates as public API) under the star-kb predicate-compatibility rules, or stay an advisory rulebook?
+- What is the registry format for canonical dataset roots (p10) and who checks it?
+- Does the evidence ledger (p02) live in the consumer repo or the global policy, and what are its tamper-evidence requirements?
+- What vocabulary covers third control-plane states (draining, finishing) beyond running/paused?
+- Schema question from f12: an explicit observation-list container for high-cardinality person sets.
+
+These questions gate any promotion from research to design; they are not permission to treat the proposals as approved.
+
+* Approval Table
+| Approval area | Required authority | State | Evidence required | Evidence reference |
+|---------------+--------------------+-------+-------------------+--------------------|
+| Research | Project owner | PENDING | Review of critique findings and public KB mint | this note |
+| Design | Project owner | NOT STARTED | Public KB module/predicate contract design | |
+| Execution | Project owner | NOT STARTED | Approved adoption by any StarIntel consumer | |
+
+* Changelog
+- 2026-09-19 :: Minted public StarIntel rule KB research note from the rule-system critique; recorded 15 proposals and 10 keeps.
