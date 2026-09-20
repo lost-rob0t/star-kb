@@ -14,6 +14,8 @@ TEMPORAL_KEYS = frozenset({
     "verified_at", "last_reviewed_at", "review_due_at", "next_run_at", "completed_at",
     "started_at", "last_run_at", "resolved_at", "suppressed_until", "adopted_at",
     "repealed_at", "awarded_at", "acquired_at", "disposed_at", "transaction_date",
+    "posted_at", "generated_at", "last_validated_at", "date", "filing_date",
+    "award_date",
 })
 
 
@@ -130,11 +132,33 @@ def endpoint_value(value: Any) -> str | None:
     if isinstance(value, str):
         return value
     if isinstance(value, dict):
-        for key in ("_id", "id", "ref", "target", "value"):
+        for key in ("_id", "id", "ref", "target", "value", "entity_id"):
             candidate = value.get(key)
             if isinstance(candidate, str) and candidate:
                 return candidate
     return None
+
+
+def string_arg(value: Any, default: str = "") -> str:
+    """Coerce a JSON value into a safe Prolog atom argument without data loss.
+
+    Strings pass through unchanged; None becomes the default; other scalars use
+    str(); containers are preserved deterministically as canonical JSON text.
+    """
+    if isinstance(value, str):
+        return value
+    if value is None:
+        return default
+    if isinstance(value, (bool, int, float)):
+        return str(value)
+    return canonical_json(value)
+
+
+def term_arg(value: Any) -> Any:
+    """Keep scalar Prolog terms as-is; render containers as canonical JSON text."""
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    return canonical_json(value)
 
 
 def _walk(doc_id: str, value: Any, path: str = "") -> Iterator[Fact]:
@@ -206,41 +230,46 @@ def _semantic_facts(document: dict[str, Any], manifest: ProjectionManifest) -> I
     for source in document.get("sources", []) if isinstance(document.get("sources"), list) else []:
         if not isinstance(source, dict):
             continue
-        source_id = str(source.get("source_id", ""))
-        if not source_id:
-            continue
+        source_id = source.get("source_id")
+        if not isinstance(source_id, str) or not source_id:
+            source_id = "src:" + content_hash(source)[:16]
         locator = str(source.get("uri", source.get("url", source.get("locator", ""))))
         yield Fact(
             "star_source",
             (
                 doc_id,
                 source_id,
-                str(source.get("kind", source.get("type", ""))),
-                locator,
-                source.get("credibility"),
-                source.get("reliability"),
-                source.get("content_hash", ""),
+                string_arg(source.get("kind", source.get("type", ""))),
+                string_arg(locator),
+                term_arg(source.get("credibility")),
+                term_arg(source.get("reliability")),
+                string_arg(source.get("content_hash", "")),
             ),
         )
 
     for evidence in document.get("evidence", []) if isinstance(document.get("evidence"), list) else []:
         if not isinstance(evidence, dict):
             continue
-        evidence_id = str(evidence.get("evidence_id", ""))
-        if not evidence_id:
-            continue
+        evidence_id = evidence.get("evidence_id")
+        if not isinstance(evidence_id, str) or not evidence_id:
+            evidence_id = "ev:" + content_hash(evidence)[:16]
         yield Fact(
             "star_evidence",
             (
                 doc_id,
                 evidence_id,
-                str(evidence.get("source_id", "")),
-                str(evidence.get("role", "")),
-                str(evidence.get("claim", evidence.get("observation", ""))),
-                evidence.get("confidence"),
-                str(evidence.get("status", "")),
+                string_arg(evidence.get("source_id", "")),
+                string_arg(evidence.get("role", "")),
+                string_arg(evidence.get("claim", evidence.get("observation", ""))),
+                term_arg(evidence.get("confidence")),
+                string_arg(evidence.get("status", "")),
             ),
         )
+        for locator_key in ("source_url", "locator", "url", "uri"):
+            locator = evidence.get(locator_key)
+            if isinstance(locator, str) and locator:
+                yield Fact("star_evidence_locator", (doc_id, evidence_id, locator))
+                break
         for contradicted in evidence.get("contradicts", []) if isinstance(evidence.get("contradicts"), list) else []:
             if isinstance(contradicted, str):
                 yield Fact("star_evidence_contradicts", (doc_id, evidence_id, contradicted))
@@ -249,7 +278,19 @@ def _semantic_facts(document: dict[str, Any], manifest: ProjectionManifest) -> I
                 yield Fact("star_evidence_corroborates", (doc_id, evidence_id, corroborated))
 
     if dtype == "relation":
-        subject = endpoint_value(data.get("subject")) or endpoint_value(data.get("source"))
+        subject_raw = data.get("subject")
+        object_raw = data.get("object", data.get("target"))
+        subject = endpoint_value(subject_raw) or endpoint_value(data.get("source"))
+        for side, raw in (("subject", subject_raw), ("object", object_raw)):
+            if endpoint_value(raw) is not None or not isinstance(raw, dict):
+                continue
+            external_id = raw.get("external_id")
+            label = raw.get("label")
+            if isinstance(external_id, str) and external_id or isinstance(label, str) and label:
+                yield Fact(
+                    "star_relation_unresolved_endpoint",
+                    (doc_id, side, string_arg(external_id), string_arg(label)),
+                )
         predicate = data.get("predicate") or data.get("predicate_id") or data.get("relation_type")
         raw_objects = data.get("object", data.get("target"))
         objects = raw_objects if isinstance(raw_objects, list) else [raw_objects]
@@ -312,12 +353,38 @@ def project_document(document: dict[str, Any], manifest: ProjectionManifest | No
     return facts
 
 
-def render_projection(documents: Iterable[dict[str, Any]], manifest: ProjectionManifest | None = None) -> str:
-    manifest = manifest or ProjectionManifest()
-    docs = list(documents)
-    lines = [
+PROJECTION_PREDICATES = (
+    "star_json_object/2",
+    "star_json_array/3",
+    "star_json_member/4",
+    "star_json_index/4",
+    "star_json_value/4",
+    "star_doc/6",
+    "star_projection_input_hash/3",
+    "star_profile/5",
+    "star_ref/3",
+    "star_time/4",
+    "star_provenance/9",
+    "star_source/7",
+    "star_evidence/7",
+    "star_evidence_locator/3",
+    "star_evidence_contradicts/3",
+    "star_evidence_corroborates/3",
+    "star_relation/9",
+    "star_relation_unresolved_endpoint/4",
+    "star_inverse_predicate/3",
+    "star_relation_qualifier/3",
+)
+
+
+def projection_header(manifest: ProjectionManifest) -> list[str]:
+    return [
         "% Generated by prolog-star-kb. Do not hand-edit.",
         "% Canonical source is StarIntel JSON; these are deterministic reasoning projections.",
+        "% Facts are grouped per document, so predicate clauses are intentionally discontiguous.",
+        ":- discontiguous "
+        + ", ".join(PROJECTION_PREDICATES)
+        + ".",
         Fact(
             "star_projection_manifest",
             (
@@ -330,11 +397,61 @@ def render_projection(documents: Iterable[dict[str, Any]], manifest: ProjectionM
             ),
         ).render(),
     ]
+
+
+def iter_document_lines(document: dict[str, Any], manifest: ProjectionManifest | None = None) -> Iterator[str]:
+    manifest = manifest or ProjectionManifest()
+    yield ""
+    yield f"% {document.get('_id', '<missing>')}"
+    yield from (fact.render() for fact in project_document(document, manifest))
+
+
+def check_unique_ids(documents: Iterable[dict[str, Any]]) -> None:
+    seen: set[str] = set()
+    for document in documents:
+        doc_id = str(document.get("_id", ""))
+        if doc_id and doc_id in seen:
+            raise ValueError(f"duplicate _id in projection input: {doc_id}")
+        seen.add(doc_id)
+
+
+def render_projection(documents: Iterable[dict[str, Any]], manifest: ProjectionManifest | None = None) -> str:
+    manifest = manifest or ProjectionManifest()
+    docs = list(documents)
+    check_unique_ids(docs)
+    lines = list(projection_header(manifest))
     for document in sorted(docs, key=lambda d: str(d.get("_id", ""))):
-        lines.append("")
-        lines.append(f"% {document.get('_id', '<missing>')}")
-        lines.extend(fact.render() for fact in project_document(document, manifest))
+        lines.extend(iter_document_lines(document, manifest))
     return "\n".join(lines) + "\n"
+
+
+def stream_projection_lines(
+    lines: Iterable[str],
+    manifest: ProjectionManifest | None = None,
+) -> Iterator[str]:
+    """Stream NDJSON text into projection lines without buffering the corpus.
+
+    Emits documents in input order; feed sorted input for canonical ordering.
+    Fails closed on invalid JSON lines and duplicate document ids, mirroring
+    render_projection's guarantees for whole-corpus jobs.
+    """
+    manifest = manifest or ProjectionManifest()
+    yield from projection_header(manifest)
+    seen: set[str] = set()
+    for lineno, line in enumerate(lines, start=1):
+        if not line.strip():
+            continue
+        try:
+            document = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"invalid NDJSON at line {lineno}: {exc}") from exc
+        if not isinstance(document, dict):
+            raise ValueError(f"NDJSON line {lineno} is not an object")
+        doc_id = str(document.get("_id", ""))
+        if doc_id and doc_id in seen:
+            raise ValueError(f"duplicate _id in projection input: {doc_id}")
+        seen.add(doc_id)
+        yield from iter_document_lines(document, manifest)
 
 
 def load_documents(text: str) -> list[dict[str, Any]]:
