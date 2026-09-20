@@ -1,0 +1,632 @@
+#+title: Star KB policy and business-logic plane
+#+description: Proposed shared Prolog policy architecture for tenancy, authorization, search disclosure, entitlements, actor admission, ingest, projection, retention, scheduling, billing classification, and other StarIntel business rules.
+#+status: proposed
+#+filetags: :star-kb:design:prolog:policy:authorization:tenancy:business-logic:
+:PROPERTIES:
+:ID: star-kb-policy-business-logic-plane
+:END:
+
+* Status
+
+Proposed design tracked by =lost-rob0t/star-kb#15=.
+
+This is an architecture expansion over the existing approved JSON -> Prolog projection/query foundation. It does not replace that foundation and does not authorize a flag-day behavioral rewrite of StarIntel services.
+
+The first vertical is tenant-aware StarIntel Search over the permanent StarIntel -> YaCy projection.
+
+* Core boundary
+
+Canonical StarIntel JSON and service-owned transactional state remain authoritative.
+
+Star KB owns deterministic *decisions* and *explanations* over those facts. It does not own authentication, storage transactions, queue mutation, leases, payment balances, or privileged side effects.
+
+#+begin_src text
+canonical StarIntel JSON
+policy/config documents
+runtime request context
+          |
+          v
+      Star KB
+  projection + policy
+          |
+          v
+bounded policy decisions
+          |
+    +-----+------+----------------+
+    |            |                |
+ server        search          actors/jobs
+    |            |                |
+    +------- owning services -----+
+            perform effects
+#+end_src
+
+The key rule is:
+
+#+begin_quote
+Prolog decides. The owning service performs the effect transactionally.
+#+end_quote
+
+* Policy inputs
+
+Policy evaluation combines two classes of input.
+
+** Durable canonical facts
+
+Examples:
+
+- tenant ownership;
+- tenant memberships;
+- groups;
+- explicit grants/shares;
+- datasets;
+- document ownership and visibility;
+- actor manifests and capabilities;
+- plan/entitlement documents;
+- quota configuration;
+- product/SKU configuration;
+- jurisdiction/data-policy documents;
+- retention policy;
+- schema/release/profile compatibility;
+- policy bundle and rule versions.
+
+These arrive through the existing deterministic StarIntel JSON -> Prolog projection.
+
+** Ephemeral trusted request context
+
+Examples:
+
+- authenticated principal id;
+- authenticated active tenant;
+- verified capability set;
+- request action;
+- resource identity;
+- current quota snapshot;
+- current actor/runtime health;
+- request source/client class;
+- time/deadline;
+- service identity.
+
+Ephemeral request context is supplied by the enforcing service through the bounded policy API. Caller-controlled body/query fields must not be allowed to masquerade as authenticated context.
+
+* Policy ABI
+
+The public surface is named and bounded. Remote callers do not submit arbitrary Prolog goals.
+
+Initial conceptual predicates:
+
+#+begin_src prolog
+star_policy_decide(+Context, +Action, +Resource, -Decision).
+star_policy_filter(+Context, +Action, +Resources, -Authorized).
+star_policy_explain(+DecisionRef, -Explanation).
+
+star_search_scope(+Context, +Request, -Scope).
+star_search_hit_decision(+Context, +Hit, -Decision).
+star_search_filter_hits(+Context, +Hits, -AuthorizedHits).
+
+star_projection_policy(+Context, +Document, +Surface, -Projection).
+star_actor_admission(+Context, +Actor, +Operation, -Decision).
+star_ingest_policy(+Context, +Observation, -Decision).
+star_schedule_policy(+Context, +Work, -Decision).
+star_entitlement_decision(+Context, +Feature, -Decision).
+#+end_src
+
+Exact names may change during implementation, but all public operations must be allowlisted, typed, bounded, and versioned.
+
+* Decision contract
+
+A normalized decision contains at least:
+
+- =effect=: =allow= or =deny=;
+- stable reason codes;
+- policy bundle id/version/hash;
+- projection generation/revision;
+- principal id;
+- authenticated tenant id;
+- action;
+- resource type/id/version;
+- obligations;
+- backend filter constraints where relevant;
+- quota/admission outputs where relevant;
+- explanation/proof reference;
+- cacheability metadata/epochs.
+
+Example conceptual response:
+
+#+begin_src json
+{
+  "effect": "allow",
+  "reasons": ["allow_owner_tenant", "allow_document_read"],
+  "obligations": [
+    {"kind": "redact", "fields": ["internal_notes"]}
+  ],
+  "filters": {
+    "tenant_ids": ["tenant-a"],
+    "dataset_ids": ["dataset-1"]
+  },
+  "policy": {
+    "bundle": "star-policy-v1",
+    "generation": 42,
+    "grant_epoch": 108
+  }
+}
+#+end_src
+
+Unknown/malformed context fails closed.
+
+* Policy composition
+
+Authorization and other policy decisions compose from broad authority to narrow authority.
+
+#+begin_src text
+platform/operator ceiling
+        |
+        v
+product/plan entitlement
+        |
+        v
+tenant policy
+        |
+        v
+dataset/resource policy
+        |
+        v
+request-specific constraints
+        |
+        v
+ALLOW + obligations
+#+end_src
+
+A lower layer may narrow authority. It may not widen authority beyond an upper layer.
+
+Deny by default.
+
+* Tenant facts
+
+Add semantic indexes derived from canonical StarIntel JSON.
+
+Conceptual predicates:
+
+#+begin_src prolog
+star_tenant(TenantId, Version).
+star_principal_tenant(PrincipalId, TenantId, MembershipKind, State).
+star_group_member(TenantId, GroupId, PrincipalId, State).
+star_resource_owner(ResourceId, TenantId).
+star_resource_dataset(ResourceId, DatasetId).
+star_resource_visibility(ResourceId, Visibility).
+star_resource_grant(ResourceId, GrantId, GranteeKind, GranteeId, Rights, State).
+star_policy_epoch(TenantId, Epoch).
+#+end_src
+
+The exact canonical JSON field/profile mapping belongs in the projector schema/index contract. These are semantic shortcuts, not independent truth.
+
+* StarIntel Search vertical
+
+** Invariant
+
+Tenant ids and relevant disclosure metadata survive the entire canonical document -> Star KB -> YaCy projection path.
+
+No private StarIntel-derived hit is returned merely because YaCy/Solr matched it.
+
+** YaCy projection metadata
+
+Each local YaCy record should carry the minimum authorization/index metadata needed for efficient pre-filtering, derived from canonical StarIntel state:
+
+- canonical StarIntel document id;
+- canonical document version/revision;
+- owning tenant id;
+- allowed tenant ids or sharing class;
+- dataset ids;
+- visibility class;
+- group/grant identifiers or a compact policy projection token;
+- Star KB policy/projection generation;
+- grant/policy epoch where needed for invalidation.
+
+Exact YaCy/Solr field names are an adapter concern.
+
+Private tenant documents must never be published into global/P2P YaCy or sent to public external engines.
+
+** Search request flow
+
+#+begin_src text
+authenticated principal/context
+          |
+          v
+ star_search_scope/3
+          |
+          +---- allowed tenant/dataset/grant scope
+          |
+          v
+ StarIntel Search
+   |       |        |
+   |       |        +--> public web/SearXNG providers
+   |       +-----------> StarIntel native search
+   +-------------------> YaCy local pre-filter
+          |
+          v
+ candidate private hits
+          |
+          v
+star_search_filter_hits/3
+          |
+          v
+ authorized result set
+#+end_src
+
+The system uses both:
+
+1. *pre-filtering* for performance and reduction of accidental exposure; and
+2. *post-authorization* for every StarIntel-derived result before release.
+
+Post-authorization is authoritative.
+
+If Star KB authorization is unavailable or uncertain, private hits fail closed.
+
+** Search disclosure levels
+
+Policy may return obligations that select a projection class:
+
+- full document;
+- normal result/snippet;
+- metadata-only;
+- redacted;
+- deny.
+
+This lets one policy engine control search/API/export/mobile/AR disclosure consistently.
+
+** Revocation
+
+Authorization caches and projected filter metadata must not make grants sticky.
+
+A grant/policy change advances an epoch/version used by:
+
+- Star KB decision caches;
+- StarIntel Search scope caches;
+- YaCy projection metadata/reprojection;
+- service decision/audit metadata.
+
+Post-authorization guarantees immediate fail-closed protection even while index reprojection catches up.
+
+* Module layout
+
+Prefer focused policy modules.
+
+#+begin_src text
+kb/
+  core/
+    star_json.pl
+    star_reasoning.pl
+
+  policy/
+    star_policy.pl
+    star_policy_context.pl
+    star_tenant_policy.pl
+    star_authorization_policy.pl
+    star_search_policy.pl
+    star_entitlement_policy.pl
+    star_actor_policy.pl
+    star_ingest_policy.pl
+    star_projection_policy.pl
+    star_retention_policy.pl
+    star_schedule_policy.pl
+    star_billing_policy.pl
+    star_migration_policy.pl
+#+end_src
+
+=star_policy.pl= is composition/dispatch glue, not a monolith containing every domain rule.
+
+* Good StarIntel uses for Prolog business logic
+
+** Authorization and tenancy
+
+Good fit:
+
+- tenant/dataset ownership and visibility;
+- groups and explicit grants;
+- capabilities;
+- delegated/narrowed authority;
+- document/target/actor access;
+- API disclosure obligations.
+
+The service still verifies credentials and executes allowed effects.
+
+** Search and disclosure
+
+Good fit:
+
+- search scope derivation;
+- provider eligibility;
+- tenant/dataset filters;
+- result disclosure/redaction class;
+- public/private routing;
+- post-filter authorization.
+
+YaCy/Solr still performs full-text retrieval and ranking.
+
+** Entitlements and product plans
+
+Good fit:
+
+- feature availability;
+- plan capabilities;
+- actor/provider access;
+- quota class;
+- trial/grace/suspended rules;
+- storage/search/recon entitlement.
+
+The billing/account service remains authoritative for payments, balances, invoices, and ledger mutation.
+
+** Actor registry, routing, and admission
+
+Good fit:
+
+- actor visibility to tenant;
+- capability compatibility;
+- tenant entitlement;
+- provider/runtime eligibility;
+- policy constraints;
+- concurrency/rate budget selection;
+- local/remote selection rules.
+
+The actor runtime owns mailboxes, workers, supervision, leases, and actual dispatch.
+
+** Target policy
+
+Good fit:
+
+- target creation eligibility;
+- actor/target compatibility;
+- scope inheritance;
+- collection/source policy;
+- tenant/dataset placement;
+- allowed follow-up actor chains.
+
+The target service owns persistence and lease fencing.
+
+** Ingest and canonicalization
+
+Good fit:
+
+- promotion eligibility from observation -> document;
+- required evidence/provenance;
+- dataset placement;
+- schema/profile selection;
+- merge/dedup decision rules;
+- relation eligibility;
+- confidence/promotion thresholds.
+
+Parsers, hashing, validation, and database mutation remain normal application code.
+
+** Projection and field disclosure
+
+Good fit:
+
+- which fields appear in search;
+- API/public/mobile/AR export classes;
+- redaction requirements;
+- tenant-aware YaCy materialization;
+- derivative publication eligibility.
+
+The projection service performs serialization/index writes.
+
+** Retention and lifecycle
+
+Good fit:
+
+- retention class;
+- archive/tombstone eligibility;
+- re-crawl/freshness class;
+- hold/exemption classification.
+
+The owning storage service performs actual deletion/archive.
+
+** Scheduling, quotas, and budgets
+
+Good fit:
+
+- work eligibility;
+- priority class;
+- concurrency/rate budget choice;
+- provider/tool/actor restrictions;
+- retry/escalation class;
+- maintenance-window policy.
+
+Valkey/schedulers own clocks, locks, queues, counters, and retries.
+
+** Billing and commercial logic
+
+Good fit:
+
+- entitlement derivation;
+- product/SKU mapping;
+- versioned price-rule selection;
+- billable event classification;
+- usage bucket classification;
+- discount/credit eligibility;
+- package compatibility.
+
+Keep actual decimal arithmetic, ledger transactions, invoice state machines, payment capture, refunds, and accounting records in transactional application code.
+
+** Schema/release migration
+
+Good fit:
+
+- migration path eligibility;
+- release/profile compatibility;
+- legacy shape recognition;
+- deterministic migration selection;
+- unknown-shape fail-closed behavior.
+
+Reuse the existing Prolog-backed migration direction in StarIntel Server rather than building a separate migration rule engine.
+
+** Alert/escalation logic
+
+Good fit:
+
+- alert class;
+- escalation conditions;
+- operator notification policy;
+- incident severity derivation;
+- retry-vs-block decisions.
+
+The notification/automation system owns delivery.
+
+* Tenant-custom policy
+
+Tenant customization should not mean arbitrary uploaded Prolog.
+
+Use an allowlisted declarative policy document/DSL.
+
+Pipeline:
+
+#+begin_src text
+tenant policy document
+        |
+        v
+validate schema + authority ceiling
+        |
+        v
+compile deterministic safe facts/rules
+        |
+        v
+tenant-namespaced policy generation
+#+end_src
+
+A tenant may narrow its own permissions and select among operator-approved policy choices. It cannot grant itself capabilities absent from the platform/operator ceiling.
+
+* Policy runtime
+
+The existing safe query-server/tool direction should gain a high-volume policy adapter.
+
+Requirements:
+
+- local/IPC or otherwise low-latency service boundary;
+- typed request/response;
+- batch decisions;
+- bounded deadlines/result sizes;
+- immutable loaded policy generation;
+- atomic generation swap;
+- in-flight request remains bound to its generation;
+- health/readiness returns bundle generation/hash;
+- no arbitrary goals;
+- no dynamic policy code from untrusted callers.
+
+* Caching
+
+Cache keys must include every material input version.
+
+At minimum where applicable:
+
+- principal/capability revision;
+- authenticated tenant;
+- policy bundle generation;
+- tenant policy epoch;
+- grant epoch;
+- entitlement epoch;
+- resource id/version;
+- action.
+
+A policy/grant/entitlement change must advance an epoch or otherwise invalidate stale allows.
+
+* Audit and explanations
+
+Each decision should produce stable machine reason codes and an optional bounded explanation/proof artifact.
+
+Examples:
+
+#+begin_src text
+allow_owner_tenant
+allow_explicit_grant
+allow_group_grant
+deny_cross_tenant
+deny_missing_capability
+deny_dataset_scope
+deny_plan_entitlement
+deny_resource_tombstoned
+deny_policy_context_invalid
+#+end_src
+
+Audit storage belongs to the service/event system. Star KB supplies the decision metadata and proof reference.
+
+* Things Prolog should not own
+
+Do not move these into Star KB:
+
+- OAuth/session/API-key verification;
+- secrets/passwords;
+- signature verification/signing;
+- CouchDB transactions or CAS;
+- RabbitMQ delivery;
+- Valkey locks/counters;
+- target lease/fencing mutation;
+- actor mailbox/supervision state;
+- payment balances/ledger mutation;
+- invoice/payment state transitions;
+- file/blob storage;
+- full-text search execution;
+- unrestricted shell/network/filesystem effects;
+- arbitrary untrusted Prolog execution.
+
+* Rollout
+
+Do this incrementally.
+
+1. Inventory existing StarIntel business-policy rules and their current owners.
+2. Add policy ABI and semantic tenant/grant indexes.
+3. Implement the search tenancy policy vertical.
+4. Wire StarIntel Search with pre-filter + authoritative post-authorization.
+5. Migrate existing StarIntel Server authorization behavior with compatibility fixtures.
+6. Add entitlements and actor/target admission.
+7. Add ingest/projection/retention/scheduling policy modules.
+8. Add billing classification and commercial rules.
+9. Move other duplicated declarative business rules only when parity tests exist.
+
+No flag-day rewrite.
+
+* Verification
+
+** Search tenancy
+
+Tests must prove:
+
+- tenant A cannot see tenant B private local-YaCy result;
+- caller-supplied tenant fields cannot widen authenticated scope;
+- group/tenant grants permit only their intended resources;
+- revoked grants stop access even before YaCy reprojection catches up;
+- anonymous search cannot surface private StarIntel projection hits;
+- private records never enter YaCy global/P2P;
+- deliberate backend pre-filter bug is caught by post-authorization;
+- tenant/visibility metadata survives projector restart and full rebuild.
+
+** Policy semantics
+
+- missing/unknown facts deny;
+- tenant policy may narrow but never widen platform authority;
+- policy generation is deterministic from the same canonical inputs;
+- entitlement downgrade changes decisions after its epoch advances;
+- in-flight request remains pinned to its generation;
+- new requests use the newly activated generation.
+
+** Cross-service parity
+
+A shared fixture set should ask equivalent policy questions through:
+
+- StarIntel Server;
+- StarIntel Search;
+- actor/runtime adapter;
+- direct Star KB test harness.
+
+All must return semantically identical decisions/reason codes for the same trusted context.
+
+* Relationship to existing work
+
+- =lost-rob0t/starintel-server#28= remains the canonical authorization-enforcement contract.
+- =starintel-labs/starintel-search#3= owns live StarIntel -> YaCy projection/search-stack behavior.
+- =starintel-labs/starintel-search#2= owns the public search UI/API/query surface.
+- The existing approved Star KB JSON projection/query design remains the foundational data/reasoning layer.
+- Existing Prolog-backed schema-migration work in StarIntel Server should converge on the same bounded policy/runtime conventions where practical.
+
+* Gate
+
+This document is a proposed design created from the operator request to map tenant-search authorization into Star KB and expand Prolog use for StarIntel business logic.
+
+Implementation should be split into independently reviewable slices after design approval. The existing =prolog-star-kb= implementation slice remains valid and should not be destabilized by an unbounded rewrite.

@@ -1,5 +1,5 @@
 #+title: Star KB
-#+description: Project index and roadmap for the shared StarIntel symbolic knowledge and Prolog reasoning projection.
+#+description: Project index and roadmap for the shared StarIntel symbolic knowledge, Prolog reasoning projection, and proposed policy/business-logic plane.
 #+status: active
 #+filetags: :star-kb:index:
 :PROPERTIES:
@@ -7,49 +7,74 @@
 :END:
 
 * Purpose
-Star KB is the shared symbolic reasoning layer used by StarIntel actors and services. Canonical StarIntel JSON remains authoritative; Star KB deterministically projects that corpus into modular Prolog facts and safe reasoning tools.
+Star KB is the shared symbolic reasoning layer used by StarIntel actors and services. Canonical StarIntel JSON remains authoritative; Star KB deterministically projects that corpus into modular Prolog facts, safe reasoning tools, and—under the proposed policy-plane expansion—bounded policy/business decisions.
 
 * Current phase
 Research and the Prolog projection/query design are approved. The active bounded implementation is =prolog-star-kb=: canonical JSON -> lossless Prolog facts + semantic indexes + AI reasoning tools.
 
 No bulk real-world ingestion is authorized in this slice.
 
+A new design proposal, tracked by issue =#15=, maps StarIntel tenant/search authorization and broader declarative business logic into a shared bounded Prolog policy plane. This proposal does not supersede the active implementation slice or authorize a flag-day migration.
+
 * Active research
 - [[file:../research/star-kb/dialect-and-kb-research.org][Dialect and KB architecture research]]
 
 * Active design
-- [[file:../design/star-kb/prolog-kb-query-server-design.org][Prolog KB/query and JSON projection design]]
+- [[file:../design/star-kb/prolog-kb-query-server-design.org][Prolog KB/query and JSON projection design]] — approved/current implementation authority.
+- [[file:../design/star-kb/policy-business-logic-plane.org][Policy and business-logic plane]] — proposed; first vertical is tenant-safe StarIntel Search / live YaCy projection.
 
 * Implementation branch
 - =feature/prolog-star-kb-projection=
+
+* Proposed design branch
+- =design/policy-business-logic-plane=
 
 * Roadmap
 1. Verify deterministic JSON -> Prolog projection and safe AI tool compiler.
 2. Add SWI-Prolog CI smoke coverage.
 3. Add query-server transport around the bounded semantic predicates.
-4. Generate MCP and Agent2Agent surfaces from the same tool catalog.
-5. Add StarLang =kb=, =reason=, and RLM bindings.
-6. Add engine adapters chosen by semantic capability.
-7. Grow domain semantic indexes without sacrificing lossless generic projection.
-8. Only then begin controlled corpus ingestion/materialization.
+4. Review/approve the policy-plane design from issue =#15=.
+5. Add a versioned bounded policy ABI and tenant/grant semantic indexes.
+6. Implement tenant-safe StarIntel Search policy: scope derivation, YaCy pre-filter obligations, authoritative post-authorization, and revocation epochs.
+7. Generate MCP and Agent2Agent surfaces from the same tool catalog.
+8. Add StarLang =kb=, =reason=, and policy bindings.
+9. Migrate existing StarIntel Server authorization logic with parity fixtures rather than a flag-day rewrite.
+10. Add entitlement, actor/target admission, ingest/projection, retention, scheduling, billing-classification, and migration policy modules in bounded slices.
+11. Add engine adapters chosen by semantic capability.
+12. Grow domain semantic indexes without sacrificing lossless generic projection.
+13. Only then begin controlled corpus ingestion/materialization.
+
+* Policy-plane boundary
+The proposed policy plane follows one rule:
+
+#+begin_quote
+Prolog decides; the owning StarIntel service performs the effect transactionally.
+#+end_quote
+
+Star KB should own declarative decisions and explanations where useful, including tenancy/authorization, search disclosure, entitlements, actor/target admission, ingest policy, projection/redaction, retention classification, scheduling/admission, billing classification, and migration compatibility.
+
+It should not own credential verification, secrets, database transactions/CAS, Rabbit/Valkey mutation, leases/fencing, payment ledgers, cryptographic signing, full-text execution, or privileged side effects.
 
 * Gates
 | Gate | State | Requirement |
 |------+-------+-------------|
 | Research | approved | Initial architecture research accepted |
-| Design | approved | Project owner approved JSON-projection design |
-| Implementation | active | Bounded =prolog-star-kb= slice only |
+| Projection design | approved | Project owner approved JSON-projection design |
+| Projection implementation | active | Bounded =prolog-star-kb= slice only |
+| Policy-plane design | proposed | Review/approval required before behavioral migration |
 | Bulk ingestion | blocked | Requires separate explicit gate |
 
 * Approval Table
 | Approval area | Required authority | State | Evidence required | Evidence reference |
 |---------------+--------------------+-------+-------------------+--------------------|
 | Research | Project owner | APPROVED | Approved initial shared-KB research direction | dialect-and-kb-research.org |
-| Design | Project owner | APPROVED | Explicit review/approval | prolog-kb-query-server-design.org |
-| Execution | Project owner | APPROVED | Explicit request to implement =prolog-star-kb= | feature/prolog-star-kb-projection |
+| Projection design | Project owner | APPROVED | Explicit review/approval | prolog-kb-query-server-design.org |
+| Projection execution | Project owner | APPROVED | Explicit request to implement =prolog-star-kb= | feature/prolog-star-kb-projection |
+| Policy-plane design | Project owner | PENDING | Review of issue =#15= / proposed design | policy-business-logic-plane.org |
 | Verification | Repository maintainer | PENDING | CI and runtime verification | implementation PR |
 
 * Changelog
 - 2026-09-10 :: Created initial Star KB project index and design gate.
 - 2026-09-18 :: Recorded explicit approval and active =prolog-star-kb= implementation slice.
 - 2026-09-18 :: Clarified canonical JSON -> deterministic Prolog projection architecture.
+- 2026-09-19 :: Added proposed StarIntel-wide Prolog policy/business-logic plane; first vertical is tenant-safe StarIntel Search over the live YaCy projection.
